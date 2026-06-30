@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>HydroChain Control Portal — COMPILEX</title>
+  <meta name="description" content="HydroChain Control Portal — Smart waterlogging management for Kolkata"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    /* ═══ TOKENS ═══ */
+    :root{
+      --cyan:#0072ff;--blue:#0056cc;--bg:#d4ecf7;
+      --border:rgba(0,90,200,.14);--border-hi:rgba(0,90,200,.32);
+      --text:#0d1f35;--text-dim:rgba(13,31,53,.52);
+      --red:#e53935;--amber:#f59e0b;--green:#059669;--purple:#7c3aed;
+      --font-hud:'Orbitron',monospace;--font-body:'Inter',sans-serif;
+      --ease:cubic-bezier(.22,1,.36,1);--ease-in:cubic-bezier(.55,0,1,.45);
+      --radius:16px;--radius-sm:10px;--radius-xs:7px;
+    }
+    *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+    html,body{width:100%;height:100%;background:linear-gradient(145deg,#cce8f6 0%,#d9eef8 40%,#c5e2f5 70%,#b8d9f2 100%);color:var(--text);font-family:var(--font-body);overflow:hidden;-webkit-font-smoothing:antialiased}
+    body::before{content:"";position:fixed;inset:0;background:
+      radial-gradient(ellipse 70% 50% at 10% 30%,rgba(255,255,255,.55) 0%,transparent 60%),
+      radial-gradient(ellipse 55% 40% at 90% 75%,rgba(180,220,250,.4) 0%,transparent 60%);
+      pointer-events:none;z-index:0}
+
+    /* ═══ SCREENS ═══ */
+    .screen{position:fixed;inset:0;z-index:40;display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transition:opacity .45s var(--ease),visibility .45s}
+    .screen.active{opacity:1;visibility:visible}
+    .screen.dash-mode{flex-direction:column;align-items:stretch;justify-content:flex-start}
+
+    /* ═══ GLASS ═══ */
+    .glass{background:rgba(255,255,255,.38);backdrop-filter:blur(32px) saturate(1.4);-webkit-backdrop-filter:blur(32px) saturate(1.4);border:1px solid rgba(255,255,255,.65);border-radius:var(--radius);box-shadow:0 20px 60px rgba(0,80,160,.12),0 2px 8px rgba(0,80,160,.06),inset 0 1px 0 rgba(255,255,255,.8)}
+
+
+    /* ═══ RAINBOW BORDER ANIMATION ═══ */
+    @keyframes card-float{
+      0%,100%{transform:translateY(0)}
+      50%{transform:translateY(-5px)}
+    }
+
+    /* ═══════════════════════════════
+       ROLE SELECT
+    ═══════════════════════════════ */
+    #screen-select{flex-direction:column;gap:52px}
+    .portal-header{text-align:center}
+    .portal-brand{display:flex;align-items:center;justify-content:center;gap:12px;margin-bottom:16px}
+    .portal-brand img{height:38px;filter:drop-shadow(0 0 10px rgba(0,198,255,.45))}
+    .portal-brand-name{font-family:var(--font-hud);font-size:1.35rem;font-weight:700;color:var(--blue);letter-spacing:.14em}
+    .portal-title{font-family:var(--font-hud);font-size:clamp(1rem,2.5vw,1.6rem);font-weight:700;color:#0d1f35;letter-spacing:.05em;margin-bottom:8px}
+    .portal-sub{font-size:.88rem;color:var(--text-dim)}
+    .role-cards{display:flex;gap:28px}
+    
+    /* Clean light-blue glassmorphic card */
+    .role-card{
+      width:290px;padding:38px 32px 32px;
+      cursor:pointer;position:relative;
+      background: rgba(212, 236, 247, 0.45); /* translucent light blue matching theme */
+      border: 1.5px solid rgba(255, 255, 255, 0.7);
+      border-radius:var(--radius);
+      backdrop-filter:blur(32px) saturate(1.8);
+      -webkit-backdrop-filter:blur(32px) saturate(1.8);
+      box-shadow:
+        0 10px 30px rgba(0, 80, 160, 0.08),
+        0 2px 8px rgba(0,0,0,0.04),
+        inset 0 1px 0 rgba(255, 255, 255, 0.85);
+      transition:transform .32s var(--ease),box-shadow .32s,border-color .28s,background-color .28s;
+    }
+    /* Hover micro-glow */
+    .role-card::before{
+      content:"";
+      position:absolute;inset:0;
+      border-radius:calc(var(--radius) - 1.5px);
+      background:linear-gradient(135deg, rgba(255,255,255,0.2) 0%, rgba(26,107,168,0.05) 100%);
+      opacity:0;transition:opacity .3s;
+      pointer-events:none;z-index:0;
+    }
+    .role-card:hover::before{opacity:1}
+    .role-card:hover{
+      transform:translateY(-8px);
+      border-color:rgba(0, 114, 255, 0.35);
+      background: rgba(212, 236, 247, 0.6);
+      box-shadow:0 20px 48px rgba(0,80,160,0.16),inset 0 1px 0 rgba(255,255,255,.9);
+    }
+    .role-card>*{position:relative;z-index:1}
+    .role-icon{width:64px;height:64px;border-radius:16px;display:flex;align-items:center;justify-content:center;font-size:1.75rem;margin-bottom:24px}
+    .role-icon.m{background:rgba(0,114,255,.12);border:1.5px solid rgba(0,114,255,.25);box-shadow:0 4px 14px rgba(0,114,255,.12)}
+    .role-icon.w{background:rgba(124,58,237,.12);border:1.5px solid rgba(124,58,237,.25);box-shadow:0 4px 14px rgba(124,58,237,.12)}
+    .role-card h2{font-family:var(--font-hud);font-size:1rem;font-weight:800;letter-spacing:.1em;color:#0a1628;margin-bottom:12px;text-shadow:0 1px 2px rgba(255,255,255,.6)}
+    .role-card p{font-size:.83rem;color:rgba(10,22,40,.82);line-height:1.75;font-weight:500}
+    .role-enter{display:inline-flex;align-items:center;gap:8px;margin-top:26px;font-family:var(--font-hud);font-size:.68rem;font-weight:700;letter-spacing:.09em;color:var(--blue);padding:10px 22px;background:rgba(255,255,255,.55);border:1.5px solid rgba(0,114,255,.28);border-radius:100px;transition:background .22s,border-color .22s,box-shadow .22s;backdrop-filter:blur(8px)}
+    .role-card:hover .role-enter{background:rgba(0,114,255,.1);border-color:var(--blue);box-shadow:0 2px 12px rgba(0,114,255,.2)}
+    .role-enter svg{width:14px;height:14px;transition:transform .22s var(--ease)}
+    .role-card:hover .role-enter svg{transform:translateX(4px)}
+
+    /* ═══════════════════════════════
+       LOGIN
+    ═══════════════════════════════ */
+    .login-card{width:440px;padding:48px 40px 40px;position:relative;background:rgba(255,255,255,.42);backdrop-filter:blur(36px) saturate(1.5);-webkit-backdrop-filter:blur(36px) saturate(1.5);border:1px solid rgba(255,255,255,.72);border-radius:var(--radius);box-shadow:0 20px 60px rgba(0,80,160,.13),inset 0 1px 0 rgba(255,255,255,.9)}
+    .btn-back{position:absolute;top:18px;left:20px;background:none;border:none;color:var(--text-dim);font-size:.78rem;font-family:var(--font-body);cursor:pointer;display:flex;align-items:center;gap:5px;padding:4px 8px;border-radius:6px;transition:color .2s,background .2s}
+    .btn-back:hover{color:var(--blue);background:rgba(0,114,255,.07)}
+    .login-badge{display:inline-flex;align-items:center;gap:8px;font-family:var(--font-hud);font-size:.62rem;font-weight:700;letter-spacing:.1em;color:var(--blue);background:rgba(0,114,255,.09);border:1px solid rgba(0,114,255,.22);padding:6px 14px;border-radius:100px;margin-bottom:22px}
+    .login-badge.w{color:var(--purple);background:rgba(124,58,237,.09);border-color:rgba(124,58,237,.22)}
+    .login-card h2{font-family:var(--font-hud);font-size:1.45rem;font-weight:700;color:#0d1f35;margin-bottom:6px;letter-spacing:.03em}
+    .login-sub{font-size:.84rem;color:var(--text-dim);margin-bottom:28px}
+    .form-group{margin-bottom:16px}
+    .form-group label{display:block;font-size:.7rem;font-weight:600;letter-spacing:.07em;color:var(--text-dim);text-transform:uppercase;margin-bottom:8px}
+    .form-group input,.form-group select{width:100%;padding:13px 16px;background:rgba(255,255,255,.55);border:1px solid rgba(0,90,180,.18);border-radius:var(--radius-sm);color:#0d1f35;font-family:var(--font-body);font-size:.93rem;outline:none;transition:border-color .22s,box-shadow .22s;appearance:none;-webkit-appearance:none}
+    .form-group select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4l4 4 4-4' stroke='%230072ff' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 14px center;padding-right:36px;cursor:pointer}
+    .form-group select option{background:#e8f4fb;color:#0d1f35}
+    .form-group input:focus,.form-group select:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(0,114,255,.12)}
+    .form-group input::placeholder{color:rgba(13,31,53,.35)}
+    .login-error{font-size:.78rem;color:#e53935;min-height:18px;margin-bottom:14px}
+    .btn-login{width:100%;padding:15px;background:linear-gradient(135deg,#0072ff,#0056cc);border:none;border-radius:var(--radius-sm);color:#fff;font-family:var(--font-hud);font-size:.78rem;font-weight:700;letter-spacing:.1em;cursor:pointer;transition:opacity .22s,transform .18s var(--ease);box-shadow:0 4px 18px rgba(0,114,255,.3)}
+    .btn-login:hover{opacity:.88;transform:translateY(-1px)}
+    .btn-login:active{transform:translateY(0)}
+    .btn-login.w{background:linear-gradient(135deg,#7c3aed,#6366f1);box-shadow:0 4px 18px rgba(124,58,237,.28)}
+    .login-hint{text-align:center;margin-top:18px;font-size:.75rem;color:rgba(13,31,53,.35)}
+    .login-hint code{color:rgba(0,114,255,.65);font-family:var(--font-hud);font-size:.68rem}
+    .select-divider{height:1px;background:rgba(0,90,180,.1);margin:6px 0 16px}
+    .area-section-label{font-family:var(--font-hud);font-size:.6rem;font-weight:700;letter-spacing:.1em;color:var(--blue);margin-bottom:12px;display:block}
+
+    /* ═══════════════════════════════
+       TOPBAR
+    ═══════════════════════════════ */
+    .dash-topbar{position:relative;z-index:30;display:flex;align-items:center;height:58px;padding:0 22px;background:rgba(255,255,255,.6);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border-bottom:1px solid rgba(0,90,180,.12);flex-shrink:0;box-shadow:0 1px 0 rgba(255,255,255,.8)}
+    .tb-brand{display:flex;align-items:center;gap:9px;font-family:var(--font-hud);font-size:.9rem;font-weight:700;letter-spacing:.1em;color:var(--blue)}
+    .tb-brand img{height:24px;filter:drop-shadow(0 0 6px rgba(0,114,255,.3))}
+    .tb-center{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:10px}
+    .tb-badge{font-family:var(--font-hud);font-size:.6rem;font-weight:700;letter-spacing:.12em;padding:5px 14px;border-radius:100px;border:1px solid}
+    .tb-badge.m{color:var(--blue);background:rgba(0,114,255,.09);border-color:rgba(0,114,255,.28)}
+    .tb-badge.w{color:var(--purple);background:rgba(124,58,237,.09);border-color:rgba(124,58,237,.28)}
+    .tb-zone{font-size:.77rem;color:var(--text-dim)}
+    .tb-zone strong{color:var(--text);font-weight:600}
+    .tb-right{margin-left:auto;display:flex;align-items:center;gap:18px}
+    .live-ind{display:flex;align-items:center;gap:7px;font-size:.72rem;color:var(--text-dim)}
+    .live-dot{width:8px;height:8px;background:#059669;border-radius:50%;animation:live-pulse 2.2s ease-in-out infinite}
+    @keyframes live-pulse{0%,100%{box-shadow:0 0 0 0 rgba(5,150,105,.55)}50%{box-shadow:0 0 0 6px rgba(5,150,105,0)}}
+    .tb-time{font-family:var(--font-hud);font-size:.68rem;color:var(--text-dim);letter-spacing:.05em;min-width:64px}
+    .btn-logout{background:rgba(255,255,255,.5);border:1px solid rgba(0,90,180,.15);color:var(--text-dim);font-size:.73rem;font-family:var(--font-body);padding:6px 16px;border-radius:8px;cursor:pointer;transition:border-color .2s,color .2s,background .2s}
+    .btn-logout:hover{border-color:rgba(229,57,53,.4);color:#e53935;background:rgba(229,57,53,.06)}
+
+    /* ═══════════════════════════════
+       DASHBOARD LAYOUT
+    ═══════════════════════════════ */
+    .dash-body{flex:1;display:flex;overflow:hidden}
+    .dash-sidebar{width:300px;flex-shrink:0;display:flex;flex-direction:column;background:rgba(255,255,255,.52);backdrop-filter:blur(24px) saturate(1.4);-webkit-backdrop-filter:blur(24px) saturate(1.4);border-right:1px solid rgba(0,90,180,.1);overflow:hidden;z-index:20;box-shadow:1px 0 0 rgba(255,255,255,.7)}
+
+    /* Dual-panel slider inside sidebar */
+    .sb-viewport{flex:1;overflow:hidden;position:relative}
+    .sb-panels{display:flex;width:600px;height:100%;transition:transform .38s var(--ease)}
+    .sb-panels.detail-open{transform:translateX(-300px)}
+    .sb-panel{width:300px;height:100%;display:flex;flex-direction:column;overflow:hidden}
+
+    /* Sidebar header */
+    .sb-header{padding:16px 16px 12px;border-bottom:1px solid rgba(0,90,180,.1);flex-shrink:0}
+    .sb-header h3{font-family:var(--font-hud);font-size:.65rem;font-weight:700;letter-spacing:.12em;color:var(--blue);margin-bottom:3px}
+    .sb-header p{font-size:.73rem;color:var(--text-dim)}
+
+    /* Stats grid */
+    .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;padding:12px;border-bottom:1px solid rgba(0,90,180,.1);flex-shrink:0}
+    .stat-tile{background:rgba(255,255,255,.55);border:1px solid rgba(0,90,180,.1);border-radius:var(--radius-xs);padding:10px 11px;box-shadow:0 1px 4px rgba(0,80,160,.06)}
+    .st-lbl{font-size:.6rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+    .st-val{font-family:var(--font-hud);font-size:1rem;font-weight:700;line-height:1}
+    .st-val.c{color:var(--blue)}.st-val.g{color:var(--green)}.st-val.a{color:var(--amber)}.st-val.r{color:var(--red)}
+
+    /* Machine list */
+    .m-list{flex:1;overflow-y:auto;padding:8px}
+    .m-list::-webkit-scrollbar{width:3px}
+    .m-list::-webkit-scrollbar-thumb{background:rgba(0,114,255,.2);border-radius:3px}
+    .m-item{padding:10px 12px;border-radius:var(--radius-xs);border:1px solid rgba(0,90,180,.1);margin-bottom:6px;cursor:pointer;background:rgba(255,255,255,.45);transition:border-color .22s,background .22s,transform .22s var(--ease);box-shadow:0 1px 3px rgba(0,80,160,.06)}
+    .m-item:hover{border-color:rgba(0,114,255,.38);background:rgba(255,255,255,.72);transform:translateX(3px);box-shadow:0 3px 12px rgba(0,80,160,.1)}
+    .m-item.active{border-color:var(--blue);background:rgba(0,114,255,.08)}
+    .m-item.central-item{border-color:rgba(245,158,11,.25);background:rgba(255,247,230,.55)}
+    .m-item.central-item:hover{border-color:rgba(245,158,11,.5);background:rgba(255,247,230,.8)}
+    .m-item.central-item.active{border-color:var(--amber);background:rgba(245,158,11,.1)}
+    .m-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+    .m-id{font-family:var(--font-hud);font-size:.6rem;font-weight:700;color:var(--blue);letter-spacing:.08em}
+    .m-id.central{color:#b45309}
+    .m-badge{font-size:.58rem;font-weight:600;padding:2px 7px;border-radius:100px}
+    .m-badge.active{background:rgba(5,150,105,.1);color:#047857;border:1px solid rgba(5,150,105,.25)}
+    .m-badge.standby{background:rgba(245,158,11,.1);color:#b45309;border:1px solid rgba(245,158,11,.25)}
+    .m-badge.inactive{background:rgba(100,116,139,.1);color:#64748b;border:1px solid rgba(100,116,139,.22)}
+    .m-badge.off{background:rgba(229,57,53,.1);color:#e53935;border:1px solid rgba(229,57,53,.22)}
+    .m-badge.central-badge{background:rgba(245,158,11,.12);color:#b45309;border:1px solid rgba(245,158,11,.3)}
+    .m-name{font-size:.78rem;font-weight:600;color:var(--text);margin-bottom:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .m-fill-mini{display:flex;align-items:center;gap:6px}
+    .m-fill-track{flex:1;height:3px;background:rgba(0,80,160,.1);border-radius:3px;overflow:hidden}
+    .m-fill-bar{height:100%;border-radius:3px;transition:width .8s ease,background .5s}
+    .m-fill-pct{font-family:var(--font-hud);font-size:.58rem;color:var(--text-dim);min-width:28px;text-align:right}
+
+    /* ═══════════════════════════════
+       DETAIL PANEL
+    ═══════════════════════════════ */
+    .detail-scroll{flex:1;overflow-y:auto;padding:0 12px 12px}
+    .detail-scroll::-webkit-scrollbar{width:3px}
+    .detail-scroll::-webkit-scrollbar-thumb{background:rgba(0,114,255,.18);border-radius:3px}
+    .detail-header{padding:14px 12px 12px;border-bottom:1px solid rgba(0,90,180,.1);display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .btn-detail-back{background:none;border:none;color:var(--text-dim);cursor:pointer;padding:4px;border-radius:5px;display:flex;align-items:center;transition:color .2s}
+    .btn-detail-back:hover{color:var(--blue)}
+    .detail-machine-name{font-size:.82rem;font-weight:600;color:#0d1f35;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .detail-machine-id{font-family:var(--font-hud);font-size:.58rem;color:var(--blue)}
+    .detail-machine-id.central{color:#b45309}
+
+    /* Sections inside detail */
+    .detail-section{padding:12px 0;border-bottom:1px solid rgba(0,90,180,.08)}
+    .detail-section:last-child{border-bottom:none}
+    .detail-section-title{font-family:var(--font-hud);font-size:.58rem;font-weight:700;letter-spacing:.1em;color:var(--text-dim);text-transform:uppercase;margin-bottom:10px}
+
+    /* Power row */
+    .power-row{display:flex;align-items:center;justify-content:space-between}
+    .power-label{font-size:.82rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px}
+    .power-status{font-size:.68rem;font-family:var(--font-hud);padding:3px 9px;border-radius:100px}
+    .power-status.on{background:rgba(5,150,105,.1);color:#047857;border:1px solid rgba(5,150,105,.25)}
+    .power-status.off{background:rgba(229,57,53,.1);color:#e53935;border:1px solid rgba(229,57,53,.22)}
+
+    /* Toggle switch */
+    .tog{position:relative;width:44px;height:24px;cursor:pointer;flex-shrink:0}
+    .tog input{opacity:0;width:0;height:0;position:absolute}
+    .tog-track{position:absolute;inset:0;border-radius:12px;background:rgba(0,80,160,.12);border:1px solid rgba(0,80,160,.15);transition:background .3s,border-color .3s}
+    .tog input:checked + .tog-track{background:var(--blue);border-color:var(--blue)}
+    .tog input:checked + .tog-track.purple-tog{background:var(--purple);border-color:var(--purple)}
+    .tog-knob{position:absolute;top:2px;left:2px;width:18px;height:18px;background:#fff;border-radius:50%;box-shadow:0 1px 4px rgba(0,0,0,.2);transition:transform .3s var(--ease)}
+    .tog input:checked ~ .tog-knob{transform:translateX(20px)}
+
+    /* Container gauge */
+    .gauge-wrap{margin-top:4px}
+    .gauge-track{height:18px;background:rgba(0,80,160,.08);border-radius:9px;overflow:hidden;border:1px solid rgba(0,80,160,.12);position:relative}
+    .gauge-fill{height:100%;border-radius:9px;transition:width .8s ease,background .5s;position:relative}
+    .gauge-fill::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.25) 50%,rgba(255,255,255,0));border-radius:9px;animation:gauge-shimmer 2s ease-in-out infinite}
+    @keyframes gauge-shimmer{0%,100%{opacity:0}50%{opacity:1}}
+    .gauge-labels{display:flex;justify-content:space-between;margin-top:5px;font-size:.65rem;color:var(--text-dim);font-family:var(--font-hud)}
+    .gauge-pct{font-family:var(--font-hud);font-size:1rem;font-weight:700;color:#0d1f35;text-align:center;margin-top:4px}
+    .gauge-warning{font-size:.68rem;color:#e53935;margin-top:6px;display:none;align-items:center;gap:5px;animation:blink-warn .9s ease-in-out infinite}
+    .gauge-warning.show{display:flex}
+    @keyframes blink-warn{0%,100%{opacity:1}50%{opacity:.35}}
+
+    /* Sensor rows */
+    .sensor-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+    .sensor-row:last-child{border-bottom:none}
+    .sensor-left{display:flex;align-items:center;gap:10px;flex:1;min-width:0}
+    .sensor-signal{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .sensor-signal.triggered{background:var(--red);box-shadow:0 0 8px rgba(255,59,59,.7);animation:sig-pulse .9s ease-in-out infinite}
+    .sensor-signal.active{background:var(--cyan);box-shadow:0 0 8px rgba(0,198,255,.7);animation:sig-pulse 1.2s ease-in-out infinite}
+    .sensor-signal.standby{background:rgba(255,255,255,.2)}
+    .sensor-signal.off-sig{background:rgba(255,255,255,.08)}
+    @keyframes sig-pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.35)}}
+    .sensor-info{min-width:0}
+    .sensor-name{font-size:.78rem;font-weight:600;color:var(--text)}
+    .sensor-state{font-size:.65rem;color:var(--text-dim);margin-top:1px}
+    .sensor-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+    .sensor-tog-label{font-size:.6rem;color:var(--text-dim)}
+
+    /* Signal log */
+    .sig-log{max-height:100px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+    .sig-log::-webkit-scrollbar{width:2px}
+    .sig-log::-webkit-scrollbar-thumb{background:rgba(0,198,255,.15);border-radius:2px}
+    .sig-entry{font-size:.68rem;padding:5px 8px;border-radius:5px;display:flex;gap:6px;align-items:flex-start}
+    .sig-entry.trigger{background:rgba(255,59,59,.08);color:var(--red);border-left:2px solid var(--red)}
+    .sig-entry.flow{background:rgba(0,198,255,.08);color:var(--cyan);border-left:2px solid var(--cyan)}
+    .sig-entry.info{background:rgba(255,255,255,.04);color:var(--text-dim);border-left:2px solid rgba(255,255,255,.1)}
+    .sig-time{font-family:var(--font-hud);font-size:.6rem;flex-shrink:0;opacity:.6;margin-top:1px}
+    .sig-no-events{font-size:.72rem;color:rgba(255,255,255,.2);text-align:center;padding:12px 0}
+
+    /* Central machine controls */
+    .central-controls{display:flex;flex-direction:column;gap:8px}
+    .btn-central{width:100%;padding:10px 14px;border-radius:var(--radius-xs);border:none;font-family:var(--font-hud);font-size:.68rem;font-weight:700;letter-spacing:.07em;cursor:pointer;transition:opacity .2s,transform .18s var(--ease),box-shadow .2s;display:flex;align-items:center;justify-content:center;gap:8px}
+    .btn-central:hover{opacity:.88;transform:translateY(-1px)}
+    .btn-central:active{transform:translateY(0)}
+    .btn-release{background:linear-gradient(135deg,var(--cyan),var(--blue));color:#fff}
+    .btn-release:hover{box-shadow:0 4px 20px rgba(0,198,255,.3)}
+    .btn-estop{background:linear-gradient(135deg,#ff3b3b,#c0392b);color:#fff}
+    .btn-estop:hover{box-shadow:0 4px 20px rgba(255,59,59,.35)}
+    .btn-broadcast{background:rgba(255,179,0,.12);color:var(--amber);border:1px solid rgba(255,179,0,.28)}
+    .connected-count{font-size:.72rem;color:var(--text-dim);text-align:center;padding:8px 0}
+    .connected-count strong{color:var(--cyan)}
+
+    /* ═══════════════════════════════
+       MAP
+    ═══════════════════════════════ */
+    .dash-map{flex:1;position:relative;z-index:10}
+    .map-el{width:100%;height:100%}
+    .leaflet-container{background:#0a0f1e;font-family:var(--font-body)}
+    .leaflet-control-zoom a{background:rgba(6,10,20,.92)!important;color:var(--cyan)!important;border-color:rgba(0,198,255,.2)!important}
+    .leaflet-control-zoom a:hover{background:rgba(0,198,255,.12)!important}
+    .leaflet-control-attribution{background:rgba(6,10,20,.75)!important;color:rgba(255,255,255,.25)!important;font-size:10px}
+    .leaflet-control-attribution a{color:rgba(0,198,255,.4)!important}
+    .pipe-line{animation:pipe-flow 1.8s linear infinite}
+    @keyframes pipe-flow{to{stroke-dashoffset:-28}}
+
+    /* Red machine marker */
+    .hyd-wrap{position:relative;width:24px;height:24px;cursor:pointer}
+    .hyd-ring{position:absolute;inset:0;border:2px solid var(--red);border-radius:50%;animation:ring-pulse 1.6s ease-out infinite}
+    .hyd-dot{position:absolute;top:5px;left:5px;width:14px;height:14px;background:var(--red);border-radius:50%;box-shadow:0 0 10px rgba(255,59,59,.7),0 0 20px rgba(255,59,59,.35);animation:dot-blink 1.6s ease-in-out infinite}
+    @keyframes ring-pulse{0%{transform:scale(1);opacity:.7}100%{transform:scale(2.4);opacity:0}}
+    @keyframes dot-blink{0%,100%{opacity:1}50%{opacity:.35}}
+
+    /* Yellow central marker */
+    .hyd-ring.cen{border-color:var(--amber)}
+    .hyd-dot.cen{background:var(--amber);box-shadow:0 0 10px rgba(255,179,0,.8),0 0 24px rgba(255,179,0,.4)}
+    .hyd-ring.cen{animation:ring-pulse-y 2s ease-out infinite}
+    @keyframes ring-pulse-y{0%{transform:scale(1);opacity:.8}100%{transform:scale(2.8);opacity:0}}
+
+    .leaflet-popup-content-wrapper{background:transparent!important;box-shadow:none!important;padding:0!important}
+    .leaflet-popup-content{margin:0!important}
+    .leaflet-popup-tip-container{display:none!important}
+    .m-popup{background:rgba(6,10,20,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid var(--border-hi);border-radius:13px;padding:16px 18px;min-width:230px;font-family:var(--font-body);box-shadow:0 16px 48px rgba(0,0,0,.6)}
+    .m-popup.central-popup{border-color:rgba(255,179,0,.4)}
+    .pop-zone{font-family:var(--font-hud);font-size:.58rem;color:var(--cyan);letter-spacing:.12em;margin-bottom:2px}
+    .pop-zone.central{color:var(--amber)}
+    .pop-name{font-size:.92rem;font-weight:700;color:#fff;margin-bottom:4px}
+    .pop-open-btn{display:inline-flex;align-items:center;gap:5px;font-family:var(--font-hud);font-size:.62rem;font-weight:700;color:var(--cyan);padding:5px 12px;border:1px solid rgba(0,198,255,.25);border-radius:100px;background:rgba(0,198,255,.07);cursor:pointer;margin-top:10px;transition:background .2s}
+    .pop-open-btn:hover{background:rgba(0,198,255,.14)}
+    .pop-open-btn.central-btn{color:var(--amber);border-color:rgba(255,179,0,.3);background:rgba(255,179,0,.07)}
+    .pop-open-btn.central-btn:hover{background:rgba(255,179,0,.14)}
+    .pop-divider{height:1px;background:rgba(0,198,255,.1);margin:10px 0}
+    .pop-row{display:flex;justify-content:space-between;align-items:center;padding:4px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+    .pop-row:last-of-type{border-bottom:none}
+    .pop-label{font-size:.68rem;color:var(--text-dim)}
+    .pop-val{font-family:var(--font-hud);font-size:.68rem;font-weight:700}
+    .pop-val.c{color:var(--cyan)}.pop-val.g{color:var(--green)}.pop-val.a{color:var(--amber)}.pop-val.r{color:var(--red)}.pop-val.gr{color:#666}
+
+    /* Map overlay */
+    .map-overlay{position:absolute;top:14px;right:14px;z-index:1000;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+    .map-legend{background:rgba(255,255,255,.75);backdrop-filter:blur(16px) saturate(1.4);border:1px solid rgba(255,255,255,.85);border-radius:11px;padding:12px 16px;pointer-events:auto;box-shadow:0 4px 20px rgba(0,80,160,.1)}
+    .map-legend h4{font-family:var(--font-hud);font-size:.58rem;font-weight:700;letter-spacing:.12em;color:var(--blue);margin-bottom:10px}
+    .leg-row{display:flex;align-items:center;gap:9px;font-size:.71rem;color:var(--text-dim);margin-bottom:6px}
+    .leg-row:last-child{margin-bottom:0}
+    .leg-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+    .leg-dot.red{background:var(--red);box-shadow:0 0 5px rgba(229,57,53,.4)}
+    .leg-dot.yellow{background:var(--amber);box-shadow:0 0 5px rgba(245,158,11,.4)}
+    .leg-pipe{width:22px;height:2px;background:linear-gradient(90deg,var(--blue),transparent);border-radius:2px;flex-shrink:0}
+    .map-count{background:rgba(255,255,255,.75);backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.85);border-radius:11px;padding:10px 16px;font-family:var(--font-hud);font-size:.62rem;color:var(--text-dim);letter-spacing:.06em;pointer-events:auto;box-shadow:0 4px 20px rgba(0,80,160,.1)}
+    .map-count strong{color:var(--blue)}
+
+    @media(prefers-reduced-motion:reduce){.hyd-ring,.hyd-dot,.live-dot,.pipe-line,.gauge-fill::after,.sensor-signal{animation:none}.hyd-dot{opacity:1}}
+    .back-site{position:fixed;bottom:22px;left:22px;z-index:50;font-size:.73rem;color:rgba(13,31,53,.35);text-decoration:none;display:flex;align-items:center;gap:6px;transition:color .22s}
+    .back-site:hover{color:var(--blue)}
+    /* Green Cluster Dot */
+    .wc-wrap{position:relative;width:36px;height:36px;cursor:pointer}
+    .wc-ring{position:absolute;inset:0;border:2px solid var(--green);border-radius:50%;animation:ring-pulse 1.8s ease-out infinite}
+    .wc-dot{position:absolute;top:6px;left:6px;width:24px;height:24px;background:var(--green);border-radius:50%;box-shadow:0 0 10px rgba(5,150,105,.7),0 0 20px rgba(5,150,105,.35);display:flex;align-items:center;justify-content:center}
+    .wc-count{font-family:var(--font-hud);font-size:.65rem;font-weight:900;color:#fff}
+
+    /* Worker Cluster Popup on Map */
+    .wkr-map-popup{background:rgba(6,10,20,.97);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border:1px solid rgba(5,150,105,.4);border-radius:13px;padding:16px;min-width:260px;font-family:var(--font-body);box-shadow:0 16px 48px rgba(0,0,0,.6);color:#fff}
+    .wmp-area{font-family:var(--font-hud);font-size:.6rem;color:var(--green);letter-spacing:.12em;margin-bottom:2px}
+    .wmp-name{font-size:.95rem;font-weight:700;color:#fff;margin-bottom:6px}
+    .wmp-machines{display:flex;gap:6px;margin-bottom:12px}
+    .wmp-m-badge{font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:4px;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.7)}
+    .wmp-divider{height:1px;background:rgba(255,255,255,.1);margin:10px 0}
+    .wmp-workflow-title{font-family:var(--font-hud);font-size:.58rem;font-weight:700;letter-spacing:.1em;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:8px}
+    .wf-strip{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;background:rgba(255,255,255,.03);padding:8px 10px;border-radius:8px;border:1px solid rgba(255,255,255,.05)}
+    .wf-step{display:flex;flex-direction:column;align-items:center;gap:4px;flex:1}
+    .wf-step-dot{width:16px;height:16px;border-radius:50%;font-size:.55rem;font-weight:800;display:flex;align-items:center;justify-content:center}
+    .wf-step-dot.ok{background:#059669;color:#fff;box-shadow:0 0 8px rgba(5,150,105,.5)}
+    .wf-step-dot.warn{background:#e53935;color:#fff;box-shadow:0 0 8px rgba(229,57,53,.5)}
+    .wf-step-dot.standby{background:rgba(255,255,255,.15);color:rgba(255,255,255,.4)}
+    .wf-step-label{font-size:.55rem;color:rgba(255,255,255,.6);font-weight:500}
+    .wf-arrow{width:12px;height:1px;background:rgba(255,255,255,.15);position:relative}
+    .wf-arrow::after{content:"";position:absolute;right:0;top:-2.5px;width:6px;height:6px;border-top:1px solid rgba(255,255,255,.4);border-right:1px solid rgba(255,255,255,.4);transform:rotate(45deg)}
+    .wmp-btns{display:flex;gap:8px}
+    .wmp-btn{flex:1;padding:8px 12px;border:none;border-radius:6px;font-family:var(--font-hud);font-size:.62rem;font-weight:700;cursor:pointer;transition:all .2s;text-align:center}
+    .wmp-btn.primary{background:linear-gradient(135deg,var(--cyan),var(--blue));color:#fff;box-shadow:0 4px 12px rgba(0,114,255,.25)}
+    .wmp-btn.primary:hover{opacity:.9;transform:translateY(-1px)}
+    .wmp-btn.secondary{background:rgba(255,255,255,.08);color:#fff;border:1px solid rgba(255,255,255,.15)}
+    .wmp-btn.secondary:hover{background:rgba(255,255,255,.14)}
+
+    /* Community Overlay */
+    .comm-overlay{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transition:opacity .35s var(--ease),visibility .35s;background:rgba(12,31,53,.3);backdrop-filter:blur(8px)}
+    .comm-overlay.open{opacity:1;visibility:visible}
+    .comm-panel{width:90%;max-width:1100px;height:82vh;display:flex;flex-direction:column;overflow:hidden;border:1.5px solid rgba(255,255,255,.8);box-shadow:0 32px 80px rgba(0,40,100,.16);background:rgba(255,255,255,.48)!important}
+    .comm-header{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;border-bottom:1px solid rgba(0,90,180,.1);background:rgba(255,255,255,.45);backdrop-filter:blur(8px)}
+    .comm-brand{font-family:var(--font-hud);font-size:.9rem;font-weight:700;color:var(--blue);letter-spacing:.08em;flex:1}
+    .comm-close{background:none;border:none;font-size:1.8rem;color:var(--text-dim);cursor:pointer;line-height:1;transition:color .2s}
+    .comm-close:hover{color:#e53935}
+    .comm-body{display:flex;flex:1;overflow:hidden}
+    .comm-roster-pane{width:320px;border-right:1px solid rgba(0,90,180,.1);overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px;background:rgba(255,255,255,.15)}
+    .comm-roster-pane::-webkit-scrollbar{width:4px}
+    .comm-roster-pane::-webkit-scrollbar-thumb{background:rgba(0,90,180,.1);border-radius:4px}
+    .comm-roster-title{font-family:var(--font-hud);font-size:.58rem;font-weight:700;color:var(--text-dim);letter-spacing:.1em;margin-bottom:6px}
+    .wkr-card{padding:14px;border-radius:10px;background:rgba(255,255,255,.45);border:1px solid rgba(0,90,180,.08);cursor:pointer;transition:all .22s var(--ease);position:relative;box-shadow:0 1px 3px rgba(0,0,0,.03)}
+    .wkr-card:hover{transform:translateY(-2px);background:rgba(255,255,255,.7);border-color:rgba(0,114,255,.2);box-shadow:0 6px 16px rgba(0,80,160,.06)}
+    .wkr-card.selected{border-color:var(--blue);background:rgba(255,255,255,.8);box-shadow:0 6px 20px rgba(0,80,160,.08)}
+    .wkr-card-top{display:flex;gap:10px;align-items:center;margin-bottom:12px}
+    .wkr-avatar{width:38px;height:38px;border-radius:50%;background:rgba(0,114,255,.08);border:1px solid rgba(0,114,255,.18);color:var(--blue);display:flex;align-items:center;justify-content:center;font-family:var(--font-hud);font-size:.8rem;font-weight:700;flex-shrink:0}
+    .wkr-info{min-width:0;flex:1}
+    .wkr-name{font-size:.85rem;font-weight:700;color:#0d1f35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .wkr-meta{font-size:.7rem;color:var(--text-dim);margin-top:1px}
+    .wkr-area-tag{font-size:.68rem;color:var(--blue);font-weight:600;margin-top:3px}
+    .perf-row{display:flex;align-items:center;gap:6px;font-size:.65rem;margin-bottom:10px}
+    .perf-label{color:var(--text-dim)}
+    .perf-track{flex:1;height:4px;background:rgba(0,90,180,.08);border-radius:2px;overflow:hidden}
+    .perf-fill{height:100%;border-radius:2px}
+    .perf-fill.hi{background:#059669}.perf-fill.mid{background:#d97706}.perf-fill.lo{background:#e53935}
+    .perf-pct{font-family:var(--font-hud);font-weight:700}
+    .perf-pct.hi{color:#059669}.perf-pct.mid{color:#d97706}.perf-pct.lo{color:#e53935}
+    .btn-msg{width:100%;padding:6px;border-radius:6px;border:1px solid rgba(0,90,180,.15);background:rgba(255,255,255,.6);color:var(--text-dim);font-size:.7rem;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--font-body)}
+    .btn-msg:hover{background:rgba(0,114,255,.07);border-color:var(--blue);color:var(--blue)}
+    .wkr-card.selected .btn-msg{background:#fff;border-color:rgba(0,114,255,.25)}
+    .wkr-card.selected .btn-msg:hover{background:rgba(0,114,255,.07);border-color:var(--blue)}
+
+    /* Profile Panel */
+    .comm-profile-pane{flex:1;overflow-y:auto;padding:24px;background:rgba(255,255,255,.25);display:flex;flex-direction:column;gap:20px}
+    .comm-profile-pane::-webkit-scrollbar{width:4px}
+    .comm-profile-pane::-webkit-scrollbar-thumb{background:rgba(0,90,180,.1);border-radius:4px}
+    .comm-empty{height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--text-dim)}
+    .comm-empty svg{width:48px;height:48px;opacity:.35;stroke:currentColor}
+    .comm-empty span{font-size:.84rem;font-weight:500;letter-spacing:.02em}
+
+    .prof-header{display:flex;gap:16px;align-items:center}
+    .prof-avatar{width:58px;height:58px;border-radius:50%;background:rgba(0,114,255,.1);border:1.5px solid rgba(0,114,255,.25);color:var(--blue);display:flex;align-items:center;justify-content:center;font-family:var(--font-hud);font-size:1.2rem;font-weight:700}
+    .prof-title{min-width:0;flex:1}
+    .prof-name{font-size:1.2rem;font-weight:800;color:#0d1f35}
+    .prof-id{font-family:var(--font-hud);font-size:.62rem;color:var(--text-dim);letter-spacing:.1em;margin-top:2px}
+    .prof-tags{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+    .prof-tag{font-size:.65rem;font-weight:700;padding:2px 8px;border-radius:4px;border:1px solid}
+    .prof-tag.area{color:var(--blue);background:rgba(0,114,255,.05);border-color:rgba(0,114,255,.15)}
+
+    .prof-details-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+    .prof-detail-card{background:rgba(255,255,255,.55);border:1px solid rgba(0,90,180,.08);padding:10px 14px;border-radius:8px;box-shadow:0 1px 4px rgba(0,80,160,.03)}
+    .pdc-label{font-size:.6rem;color:var(--text-dim);text-transform:uppercase;letter-spacing:.05em;margin-bottom:3px}
+    .pdc-value{font-size:.85rem;font-weight:700;color:#0d1f35}
+    .pdc-value.blue{color:var(--blue)}
+
+    .prof-metrics{background:rgba(255,255,255,.5);border:1px solid rgba(0,90,180,.08);padding:16px;border-radius:10px}
+    .prof-metrics h4,.prof-msg-section h4{font-family:var(--font-hud);font-size:.62rem;font-weight:700;letter-spacing:.08em;color:var(--text-dim);margin-bottom:12px;text-transform:uppercase}
+    .metric-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid rgba(0,90,180,.05);font-size:.8rem}
+    .metric-row:last-child{border-bottom:none;margin-bottom:0}
+    .metric-row-label{color:var(--text-dim);font-weight:500}
+    .metric-row-val{font-family:var(--font-hud);font-weight:700}
+
+    /* Message bubbles */
+    .prof-msg-section{background:rgba(255,255,255,.55);border:1px solid rgba(0,90,180,.08);padding:16px;border-radius:10px;display:flex;flex-direction:column}
+    .msg-thread{height:160px;overflow-y:auto;padding:8px;background:rgba(255,255,255,.4);border:1px solid rgba(0,90,180,.06);border-radius:8px;display:flex;flex-direction:column;gap:8px;margin-bottom:10px}
+    .msg-thread::-webkit-scrollbar{width:3px}
+    .msg-thread::-webkit-scrollbar-thumb{background:rgba(0,90,180,.08);border-radius:3px}
+    .msg-empty{font-size:.72rem;color:var(--text-dim);text-align:center;margin:auto}
+    .msg-bubble{max-width:80%;padding:8px 12px;border-radius:10px;font-size:.78rem;line-height:1.45;word-break:break-word}
+    .msg-bubble.sent{background:linear-gradient(135deg,var(--cyan),var(--blue));color:#fff;align-self:flex-end;border-bottom-right-radius:2px;box-shadow:0 2px 8px rgba(0,114,255,.15)}
+    .msg-bubble.recv{background:rgba(255,255,255,.8);color:#0d1f35;border:1px solid rgba(0,90,180,.08);align-self:flex-start;border-bottom-left-radius:2px;box-shadow:0 1px 3px rgba(0,0,0,.03)}
+    .msg-meta{font-size:.55rem;opacity:.65;margin-top:4px;text-align:right}
+    .msg-bubble.recv .msg-meta{text-align:left}
+    .msg-compose{display:flex;gap:8px}
+    .msg-compose input{flex:1;padding:10px 14px;background:#fff;border:1px solid rgba(0,90,180,.14);border-radius:6px;color:#0d1f35;font-size:.82rem;outline:none;transition:border-color .2s}
+    .msg-compose input:focus{border-color:var(--blue)}
+    .msg-compose button{padding:0 16px;background:var(--blue);border:none;border-radius:6px;color:#fff;font-family:var(--font-hud);font-size:.65rem;font-weight:700;letter-spacing:.08em;cursor:pointer;transition:opacity .2s}
+    .msg-compose button:hover{opacity:.9}
+
+    /* Improvement Modal Backdrop & Box */
+    .im-backdrop{position:fixed;inset:0;z-index:9500;display:flex;align-items:center;justify-content:center;opacity:0;visibility:hidden;transition:opacity .3s var(--ease),visibility .3s;background:rgba(12,31,53,.35);backdrop-filter:blur(6px)}
+    .im-backdrop.open{opacity:1;visibility:visible}
+    .im-modal{width:460px;overflow:hidden;border:1px solid rgba(255,255,255,.75);box-shadow:0 24px 64px rgba(0,40,90,.18);background:rgba(255,255,255,.55)!important}
+    .im-header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid rgba(0,90,180,.08);background:rgba(255,255,255,.3)}
+    .im-header h3{font-family:var(--font-hud);font-size:.8rem;font-weight:700;color:var(--blue);letter-spacing:.05em}
+    .im-close{background:none;border:none;font-size:1.6rem;color:var(--text-dim);cursor:pointer;line-height:1;transition:color .2s}
+    .im-close:hover{color:#e53935}
+    .im-body{padding:20px}
+    .im-intro{font-size:.84rem;color:var(--text-dim);margin-bottom:16px}
+    .im-intro strong{color:#0d1f35}
+    .im-field{margin-bottom:14px}
+    .im-field label{display:block;font-size:.6rem;font-weight:600;letter-spacing:.05em;color:var(--text-dim);margin-bottom:6px;text-transform:uppercase}
+    .im-field select,.im-field textarea{width:100%;padding:10px 12px;background:rgba(255,255,255,.65);border:1px solid rgba(0,90,180,.15);border-radius:6px;color:#0d1f35;font-size:.85rem;outline:none;transition:border-color .2s;font-family:var(--font-body)}
+    .im-field select:focus,.im-field textarea:focus{border-color:var(--blue)}
+    .im-field textarea{resize:none}
+    .im-submit-btn{width:100%;padding:12px;background:linear-gradient(135deg,var(--cyan),var(--blue));border:none;border-radius:6px;color:#fff;font-family:var(--font-hud);font-size:.72rem;font-weight:700;letter-spacing:.08em;cursor:pointer;transition:all .2s;box-shadow:0 4px 12px rgba(0,114,255,.2)}
+    .im-submit-btn:hover{opacity:.92;transform:translateY(-1px);box-shadow:0 6px 16px rgba(0,114,255,.25)}
+    .im-success-icon{width:48px;height:48px;background:rgba(5,150,105,.1);border:1.5px solid rgba(5,150,105,.3);color:#059669;font-size:1.6rem;font-weight:700;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:10px auto 14px}
+    #im-success{text-align:center;padding:10px 0}
+    #im-success h4{font-family:var(--font-hud);font-size:.84rem;font-weight:700;color:#059669;margin-bottom:6px}
+    #im-success p{font-size:.78rem;color:var(--text-dim);line-height:1.5}
+  </style>
+</head>
+<body>
+
+<!-- ══ ROLE SELECT ══ -->
+<div id="screen-select" class="screen active">
+  <div class="portal-header">
+    <div class="portal-brand"><img src="compileXlogo.jpeg" alt="COMPILEX"/><span class="portal-brand-name">COMPILEX</span></div>
+    <h1 class="portal-title">HYDROCHAIN CONTROL PORTAL</h1>
+    <p class="portal-sub">Kolkata Smart Waterlogging Infrastructure — Select your access role</p>
+  </div>
+  <div class="role-cards">
+    <div class="glass role-card" onclick="goLogin('manager')" tabindex="0" onkeydown="if(event.key==='Enter')goLogin('manager')">
+      <div class="role-icon m">🏙️</div>
+      <h2>MANAGER</h2>
+      <p>Division-wide control across Kolkata. Monitor all machines, central hubs, sensor states, and container levels. Override any machine in your division.</p>
+      <div class="role-enter">MANAGER PORTAL <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg></div>
+    </div>
+    <div class="glass role-card" onclick="goLogin('worker')" tabindex="0" onkeydown="if(event.key==='Enter')goLogin('worker')">
+      <div class="role-icon w">🔧</div>
+      <h2>WORKER</h2>
+      <p>Zone-specific access for your assigned locality. Control machines, toggle sensors, monitor container levels, and respond to pressure and flow alerts.</p>
+      <div class="role-enter" style="color:var(--purple);border-color:rgba(139,92,246,.28)">WORKER PORTAL <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h10M9 4l4 4-4 4"/></svg></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ MANAGER LOGIN ══ -->
+<div id="screen-login-manager" class="screen">
+  <div class="glass login-card">
+    <button class="btn-back" onclick="goSelect()">← Back</button>
+    <div class="login-badge">🏙️&nbsp; MANAGER ACCESS</div>
+    <h2>Manager Login</h2>
+    <p class="login-sub">Authenticate and select your Kolkata division</p>
+    <div class="form-group"><label for="mgr-u">USERNAME</label><input type="text" id="mgr-u" placeholder="Enter username" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin('manager')"/></div>
+    <div class="form-group"><label for="mgr-p">PASSWORD</label><input type="password" id="mgr-p" placeholder="Enter password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin('manager')"/></div>
+    <div class="select-divider"></div>
+    <span class="area-section-label">ASSIGNED DIVISION</span>
+    <div class="form-group">
+      <label for="mgr-div">KOLKATA DIVISION</label>
+      <select id="mgr-div">
+        <option value="">— Select your division —</option>
+        <option value="north">North Kolkata Division</option>
+        <option value="south">South Kolkata Division</option>
+        <option value="east">East Kolkata Division</option>
+        <option value="west">West &amp; Central Kolkata Division</option>
+      </select>
+    </div>
+    <div class="login-error" id="mgr-err" role="alert" aria-live="polite"></div>
+    <button class="btn-login" onclick="doLogin('manager')">ENTER MANAGER SYSTEM</button>
+    <p class="login-hint">Demo: <code>manager</code> / <code>hydro2024</code> + any division</p>
+  </div>
+</div>
+
+<!-- ══ WORKER LOGIN ══ -->
+<div id="screen-login-worker" class="screen">
+  <div class="glass login-card">
+    <button class="btn-back" onclick="goSelect()">← Back</button>
+    <div class="login-badge w">🔧&nbsp; WORKER ACCESS</div>
+    <h2>Worker Login</h2>
+    <p class="login-sub">Authenticate and select your assigned locality</p>
+    <div class="form-group"><label for="wkr-u">WORKER ID</label><input type="text" id="wkr-u" placeholder="Enter worker ID" autocomplete="username" onkeydown="if(event.key==='Enter')doLogin('worker')"/></div>
+    <div class="form-group"><label for="wkr-p">PASSWORD</label><input type="password" id="wkr-p" placeholder="Enter password" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin('worker')"/></div>
+    <div class="select-divider"></div>
+    <span class="area-section-label">ASSIGNED LOCALITY</span>
+    <div class="form-group">
+      <label for="wkr-zone">YOUR ZONE</label>
+      <select id="wkr-zone">
+        <option value="">— Select your assigned area —</option>
+        <optgroup label="North Kolkata"><option value="dum_dum">Dum Dum</option><option value="shyambazar">Shyambazar</option><option value="bagbazar">Bagbazar</option><option value="lake_town">Lake Town</option></optgroup>
+        <optgroup label="South Kolkata"><option value="jadavpur">Jadavpur</option><option value="behala">Behala</option><option value="tollygunge">Tollygunge</option><option value="garia">Garia</option></optgroup>
+        <optgroup label="East Kolkata"><option value="salt_lake">Salt Lake (Bidhannagar)</option><option value="new_town">New Town (Rajarhat)</option><option value="kasba">Kasba</option></optgroup>
+        <optgroup label="West &amp; Central"><option value="park_street">Park Street</option><option value="esplanade">Esplanade / BBD Bagh</option><option value="howrah">Howrah</option></optgroup>
+      </select>
+    </div>
+    <div class="login-error" id="wkr-err" role="alert" aria-live="polite"></div>
+    <button class="btn-login w" onclick="doLogin('worker')">ENTER WORKER SYSTEM</button>
+    <p class="login-hint">Demo: <code>worker01</code> / <code>kolkata123</code> + any zone</p>
+  </div>
+</div>
+
+<!-- ══ MANAGER DASHBOARD ══ -->
+<div id="screen-dashboard-manager" class="screen dash-mode">
+  <div class="dash-topbar">
+    <div class="tb-brand"><img src="compileXlogo.jpeg" alt="COMPILEX"/> COMPILEX</div>
+    <div class="tb-center"><span class="tb-badge m">MANAGER</span><span class="tb-zone" id="tb-zone-mgr">Kolkata</span></div>
+    <div class="tb-right">
+      <button class="btn-comm-trigger" onclick="openCommunity()" style="margin-right:12px;background:rgba(5,150,105,0.08);border:1px solid rgba(5,150,105,0.22);color:#059669;padding:6px 14px;border-radius:8px;font-family:var(--font-hud);font-size:0.65rem;font-weight:700;letter-spacing:0.08em;cursor:pointer;display:flex;align-items:center;gap:6px;transition:all 0.22s var(--ease)">👥 COMMUNITY</button>
+      <div class="live-ind"><div class="live-dot"></div> LIVE</div>
+      <div class="tb-time" id="time-mgr"></div>
+      <button class="btn-logout" onclick="doLogout()">LOGOUT</button>
+    </div>
+  </div>
+  <div class="dash-body">
+    <aside class="dash-sidebar">
+      <div class="sb-header"><h3 id="sb-title-mgr">DIVISION NETWORK</h3><p id="sb-sub-mgr">Loading…</p></div>
+      <div class="stats-grid" id="stats-mgr"></div>
+      <div class="sb-viewport">
+        <div class="sb-panels" id="sb-panels-mgr">
+          <!-- Panel A: Machine list -->
+          <div class="sb-panel"><div class="m-list" id="mlist-mgr"></div></div>
+          <!-- Panel B: Machine detail/control -->
+          <div class="sb-panel" id="detail-panel-mgr">
+            <div class="detail-header">
+              <button class="btn-detail-back" onclick="backToList('manager')" title="Back">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4l-4 4 4 4"/></svg>
+              </button>
+              <div><div class="detail-machine-id" id="det-id-mgr"></div><div class="detail-machine-name" id="det-name-mgr"></div></div>
+            </div>
+            <div class="detail-scroll" id="det-scroll-mgr"></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="dash-map">
+      <div id="map-mgr" class="map-el"></div>
+      <div class="map-overlay">
+        <div class="map-legend">
+          <h4>MAP LEGEND</h4>
+          <div class="leg-row"><div class="leg-dot green-dot" style="background:#059669;box-shadow:0 0 5px rgba(5,150,105,0.4)"></div> Worker Cluster</div>
+          <div class="leg-row"><div class="leg-dot yellow"></div> Central Hub</div>
+          <div class="leg-row"><div class="leg-pipe"></div> Pipe Connection</div>
+        </div>
+        <div class="map-count" id="mcount-mgr"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ WORKER DASHBOARD ══ -->
+<div id="screen-dashboard-worker" class="screen dash-mode">
+  <div class="dash-topbar">
+    <div class="tb-brand"><img src="compileXlogo.jpeg" alt="COMPILEX"/> COMPILEX</div>
+    <div class="tb-center"><span class="tb-badge w">WORKER</span><span class="tb-zone" id="tb-zone-wkr">Zone</span></div>
+    <div class="tb-right"><div class="live-ind"><div class="live-dot"></div> LIVE</div><div class="tb-time" id="time-wkr"></div><button class="btn-logout" onclick="doLogout()">LOGOUT</button></div>
+  </div>
+  <div class="dash-body">
+    <aside class="dash-sidebar">
+      <div class="sb-header"><h3>ZONE MACHINES</h3><p id="sb-sub-wkr">Your assigned locality</p></div>
+      <div class="stats-grid" id="stats-wkr"></div>
+      <div class="sb-viewport">
+        <div class="sb-panels" id="sb-panels-wkr">
+          <div class="sb-panel"><div class="m-list" id="mlist-wkr"></div></div>
+          <div class="sb-panel" id="detail-panel-wkr">
+            <div class="detail-header">
+              <button class="btn-detail-back" onclick="backToList('worker')" title="Back">
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4l-4 4 4 4"/></svg>
+              </button>
+              <div><div class="detail-machine-id" id="det-id-wkr"></div><div class="detail-machine-name" id="det-name-wkr"></div></div>
+            </div>
+            <div class="detail-scroll" id="det-scroll-wkr"></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+    <div class="dash-map">
+      <div id="map-wkr" class="map-el"></div>
+      <div class="map-overlay">
+        <div class="map-legend">
+          <h4>MAP LEGEND</h4>
+          <div class="leg-row"><div class="leg-dot red"></div> Machine Node</div>
+          <div class="leg-row"><div class="leg-dot yellow"></div> Central Hub</div>
+          <div class="leg-row"><div class="leg-pipe"></div> Pipe Connection</div>
+        </div>
+        <div class="map-count" id="mcount-wkr"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ COMMUNITY OVERLAY ══ -->
+<div id="comm-overlay" class="comm-overlay">
+  <div class="comm-panel glass">
+    <div class="comm-header">
+      <div class="comm-brand">👥 DIVISION COMMUNITY & roster</div>
+      <button class="comm-close" onclick="closeCommunity()">&times;</button>
+    </div>
+    <div class="comm-body">
+      <div class="comm-roster-pane" id="comm-roster">
+        <!-- populated dynamically -->
+      </div>
+      <div class="comm-profile-pane" id="comm-profile">
+        <!-- populated dynamically -->
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ IMPROVEMENT REQUEST MODAL ══ -->
+<div id="improve-modal-backdrop" class="im-backdrop">
+  <div class="im-modal glass">
+    <div class="im-header">
+      <h3>Request Workflow Improvement</h3>
+      <button class="im-close" onclick="closeImproveModal()">&times;</button>
+    </div>
+    <div class="im-body">
+      <div id="im-form">
+        <p class="im-intro">Submitting improvement dispatch for <strong><span id="im-area-label">Dum Dum</span></strong>.</p>
+        <div class="im-field">
+          <label>ISSUE CATEGORY</label>
+          <select id="im-type">
+            <option value="">-- Select type --</option>
+            <option value="pressure">Pressure Sensor Defect</option>
+            <option value="flow">Flow Valve Obstruction</option>
+            <option value="conic">Pipe Chain Connection Interruption</option>
+            <option value="automation">AI Orchestration Logic Lag</option>
+          </select>
+        </div>
+        <div class="im-field">
+          <label>PRIORITY LEVEL</label>
+          <select id="im-priority">
+            <option value="">-- Select priority --</option>
+            <option value="low">Low - Routine Optimization</option>
+            <option value="medium">Medium - Response Time Lag</option>
+            <option value="high">High - Immediate Dispatch Required</option>
+          </select>
+        </div>
+        <div class="im-field">
+          <label>DESCRIPTION & NOTES</label>
+          <textarea id="im-desc" rows="4" placeholder="Detail the defect or required optimization here..."></textarea>
+        </div>
+        <button class="im-submit-btn" onclick="submitImprovement()">SUBMIT IMPROVEMENT DISPATCH</button>
+      </div>
+      <div id="im-success" style="display:none">
+        <div class="im-success-icon">✓</div>
+        <h4>Dispatch Submitted Successfully</h4>
+        <p>Improvement request has been logged in the community query board and routed directly to the zone worker's terminal.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<a class="back-site" href="index.html">← Back to main site</a>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+/* ═══════════════════════════════════════════════
+   STATIC MACHINE DATA
+═══════════════════════════════════════════════ */
+var MACHINES = [
+  /* NORTH */
+  {id:"KL001",name:"Dum Dum Airport Node",   lat:22.6520,lng:88.3900,area:"dum_dum",   region:"north",areaLabel:"Dum Dum",   containerFill:62},
+  {id:"KL002",name:"Dum Dum Rail Relay",      lat:22.6480,lng:88.3850,area:"dum_dum",   region:"north",areaLabel:"Dum Dum",   containerFill:45},
+  {id:"KL003",name:"Shyambazar Main Hub",     lat:22.5874,lng:88.3697,area:"shyambazar",region:"north",areaLabel:"Shyambazar",containerFill:78},
+  {id:"KL004",name:"Bagbazar Drain Node",     lat:22.5877,lng:88.3603,area:"bagbazar",  region:"north",areaLabel:"Bagbazar",  containerFill:30},
+  {id:"KL005",name:"Lake Town Station",       lat:22.5970,lng:88.3981,area:"lake_town", region:"north",areaLabel:"Lake Town", containerFill:55},
+  {id:"KL006",name:"Lake Town Secondary",     lat:22.5990,lng:88.4010,area:"lake_town", region:"north",areaLabel:"Lake Town", containerFill:40},
+  /* NORTH CENTRAL */
+  {id:"KL-CN",name:"North Kolkata Central Hub",lat:22.6200,lng:88.3850,area:"north_central",region:"north",areaLabel:"Central — North",containerFill:10,isCentral:true},
+  /* SOUTH */
+  {id:"KL007",name:"Jadavpur Pump A",         lat:22.4985,lng:88.3716,area:"jadavpur",  region:"south",areaLabel:"Jadavpur",  containerFill:88},
+  {id:"KL008",name:"Jadavpur Pump B",         lat:22.5010,lng:88.3750,area:"jadavpur",  region:"south",areaLabel:"Jadavpur",  containerFill:52},
+  {id:"KL009",name:"Behala Main Node",        lat:22.4920,lng:88.3175,area:"behala",    region:"south",areaLabel:"Behala",    containerFill:35},
+  {id:"KL010",name:"Behala South Relay",      lat:22.4880,lng:88.3140,area:"behala",    region:"south",areaLabel:"Behala",    containerFill:20},
+  {id:"KL011",name:"Tollygunge Hub",          lat:22.5102,lng:88.3437,area:"tollygunge",region:"south",areaLabel:"Tollygunge",containerFill:71},
+  {id:"KL012",name:"Garia End Station",       lat:22.4635,lng:88.3914,area:"garia",     region:"south",areaLabel:"Garia",     containerFill:15},
+  /* SOUTH CENTRAL */
+  {id:"KL-CS",name:"South Kolkata Central Hub",lat:22.4850,lng:88.3450,area:"south_central",region:"south",areaLabel:"Central — South",containerFill:10,isCentral:true},
+  /* EAST */
+  {id:"KL013",name:"Salt Lake Sector V Hub",  lat:22.5958,lng:88.4260,area:"salt_lake", region:"east", areaLabel:"Salt Lake", containerFill:92},
+  {id:"KL014",name:"Salt Lake Relay Node",    lat:22.5900,lng:88.4180,area:"salt_lake", region:"east", areaLabel:"Salt Lake", containerFill:68},
+  {id:"KL015",name:"New Town Main Pump",      lat:22.6012,lng:88.4805,area:"new_town",  region:"east", areaLabel:"New Town",  containerFill:50},
+  {id:"KL016",name:"New Town Junction",       lat:22.5950,lng:88.4750,area:"new_town",  region:"east", areaLabel:"New Town",  containerFill:33},
+  {id:"KL017",name:"Kasba Junction Node",     lat:22.5256,lng:88.3885,area:"kasba",     region:"east", areaLabel:"Kasba",     containerFill:60},
+  /* EAST CENTRAL */
+  {id:"KL-CE",name:"East Kolkata Central Hub",lat:22.5850,lng:88.4450,area:"east_central",region:"east",areaLabel:"Central — East",containerFill:10,isCentral:true},
+  /* WEST */
+  {id:"KL018",name:"Park Street Node A",      lat:22.5519,lng:88.3515,area:"park_street",region:"west",areaLabel:"Park Street",containerFill:44},
+  {id:"KL019",name:"Park Street Node B",      lat:22.5545,lng:88.3530,area:"park_street",region:"west",areaLabel:"Park Street",containerFill:80},
+  {id:"KL020",name:"Esplanade Main Hub",      lat:22.5687,lng:88.3522,area:"esplanade", region:"west", areaLabel:"Esplanade",  containerFill:95},
+  {id:"KL021",name:"Esplanade Secondary",     lat:22.5660,lng:88.3500,area:"esplanade", region:"west", areaLabel:"Esplanade",  containerFill:58},
+  {id:"KL022",name:"Howrah Bridge Node",      lat:22.5860,lng:88.2700,area:"howrah",    region:"west", areaLabel:"Howrah",     containerFill:37},
+  {id:"KL023",name:"Howrah Station Relay",    lat:22.5839,lng:88.2650,area:"howrah",    region:"west", areaLabel:"Howrah",     containerFill:25},
+  /* WEST CENTRAL */
+  {id:"KL-CW",name:"West & Central Hub",      lat:22.5700,lng:88.3350,area:"west_central",region:"west",areaLabel:"Central — West",containerFill:10,isCentral:true}
+];
+
+var PIPE_CHAIN = ["KL022","KL023","KL-CW","KL020","KL021","KL018","KL019","KL003","KL004","KL-CN","KL005","KL006","KL001","KL002","KL013","KL014","KL-CE","KL015","KL016","KL017","KL011","KL007","KL008","KL-CS","KL009","KL010","KL012"];
+
+var REGIONS = {
+  north:{label:"North Kolkata Division",center:[22.6150,88.3850],zoom:13},
+  south:{label:"South Kolkata Division",center:[22.4950,88.3450],zoom:13},
+  east: {label:"East Kolkata Division", center:[22.5850,88.4400],zoom:12},
+  west: {label:"West & Central Kolkata",center:[22.5700,88.3200],zoom:13}
+};
+var AREA_LABELS = {dum_dum:"Dum Dum",shyambazar:"Shyambazar",bagbazar:"Bagbazar",lake_town:"Lake Town",jadavpur:"Jadavpur",behala:"Behala",tollygunge:"Tollygunge",garia:"Garia",salt_lake:"Salt Lake",new_town:"New Town",kasba:"Kasba",park_street:"Park Street",esplanade:"Esplanade",howrah:"Howrah"};
+var AREA_TO_REGION = {dum_dum:"north",shyambazar:"north",bagbazar:"north",lake_town:"north",jadavpur:"south",behala:"south",tollygunge:"south",garia:"south",salt_lake:"east",new_town:"east",kasba:"east",park_street:"west",esplanade:"west",howrah:"west"};
+var CREDS = {manager:"hydro2024",worker01:"kolkata123"};
+
+/* ═══ WORKER ROSTER (one worker per area) ═══ */
+var WORKERS=[
+  {id:'W001',name:'Arjun Das',       age:31,area:'dum_dum',    region:'north',machines:['KL001','KL002'],perf:85,contact:'98300-12345',joined:'Jan 2023',responseTime:'4.2 min',alertsHandled:127,uptime:94},
+  {id:'W002',name:'Priya Sharma',    age:28,area:'shyambazar', region:'north',machines:['KL003'],        perf:92,contact:'98300-54321',joined:'Mar 2023',responseTime:'3.1 min',alertsHandled:98, uptime:97},
+  {id:'W003',name:'Rohit Ghosh',     age:35,area:'bagbazar',   region:'north',machines:['KL004'],        perf:78,contact:'98300-67890',joined:'Jun 2022',responseTime:'5.8 min',alertsHandled:143,uptime:89},
+  {id:'W004',name:'Meera Banerjee',  age:27,area:'lake_town',  region:'north',machines:['KL005','KL006'],perf:88,contact:'98300-98765',joined:'Aug 2023',responseTime:'3.7 min',alertsHandled:81, uptime:95},
+  {id:'W005',name:'Suresh Mondal',   age:42,area:'jadavpur',   region:'south',machines:['KL007','KL008'],perf:72,contact:'98310-23456',joined:'Feb 2022',responseTime:'6.4 min',alertsHandled:201,uptime:86},
+  {id:'W006',name:'Ankita Roy',      age:30,area:'behala',     region:'south',machines:['KL009','KL010'],perf:90,contact:'98310-54678',joined:'Apr 2023',responseTime:'3.3 min',alertsHandled:76, uptime:96},
+  {id:'W007',name:'Dipak Sen',       age:38,area:'tollygunge', region:'south',machines:['KL011'],        perf:81,contact:'98310-76543',joined:'Nov 2022',responseTime:'4.9 min',alertsHandled:118,uptime:91},
+  {id:'W008',name:'Fatima Khatun',   age:25,area:'garia',      region:'south',machines:['KL012'],        perf:96,contact:'98310-89012',joined:'Sep 2023',responseTime:'2.8 min',alertsHandled:54, uptime:99},
+  {id:'W009',name:'Bijoy Chatterjee',age:44,area:'salt_lake',  region:'east', machines:['KL013','KL014'],perf:69,contact:'98320-12345',joined:'Jan 2022',responseTime:'7.1 min',alertsHandled:230,uptime:83},
+  {id:'W010',name:'Sanjay Mukherjee',age:33,area:'new_town',   region:'east', machines:['KL015','KL016'],perf:87,contact:'98320-56789',joined:'May 2023',responseTime:'3.9 min',alertsHandled:89, uptime:94},
+  {id:'W011',name:'Kavita Pal',      age:29,area:'kasba',      region:'east', machines:['KL017'],        perf:93,contact:'98320-78901',joined:'Jul 2023',responseTime:'2.9 min',alertsHandled:67, uptime:98},
+  {id:'W012',name:'Mohan Dey',       age:40,area:'park_street',region:'west', machines:['KL018','KL019'],perf:76,contact:'98330-23456',joined:'Mar 2022',responseTime:'5.5 min',alertsHandled:175,uptime:88},
+  {id:'W013',name:'Rupa Bose',       age:34,area:'esplanade',  region:'west', machines:['KL020','KL021'],perf:83,contact:'98330-56789',joined:'Oct 2022',responseTime:'4.3 min',alertsHandled:142,uptime:92},
+  {id:'W014',name:'Kalyan Saha',     age:36,area:'howrah',     region:'west', machines:['KL022','KL023'],perf:79,contact:'98330-78901',joined:'Dec 2021',responseTime:'5.2 min',alertsHandled:193,uptime:90}
+];
+
+/* ═══════════════════════════════════════════════
+   MACHINE STATE (mutable runtime)
+═══════════════════════════════════════════════ */
+var STATE = {};
+MACHINES.forEach(function(m){
+  var fill = m.containerFill || 0;
+  STATE[m.id] = {
+    machineOn: true,
+    sensorPressure: true,
+    sensorFlow: true,
+    containerFill: fill,
+    pressureTriggered: fill >= 80,
+    flowActive: fill >= 80,
+    signals: fill >= 80
+      ? [{type:'trigger',msg:'PRESSURE TRIGGERED — Container at '+fill+'%',time:new Date()}]
+      : []
+  };
+});
+
+/* ═══════════════════════════════════════════════
+   STATE / NAV
+═══════════════════════════════════════════════ */
+var mapMgr=null,mapWkr=null,markerRef={},clocks={},simInterval=null;
+var selectedId={manager:null,worker:null};
+var currentRole=null,currentArea=null;
+
+function showScreen(id){document.querySelectorAll('.screen').forEach(function(s){s.classList.remove('active')});var el=document.getElementById(id);if(el)el.classList.add('active')}
+function goSelect(){showScreen('screen-select')}
+function goLogin(role){showScreen('screen-login-'+role)}
+
+/* ═══════════════════════════════════════════════
+   LOGIN
+═══════════════════════════════════════════════ */
+function doLogin(role){
+  var isMgr=role==='manager';
+  var u=document.getElementById(isMgr?'mgr-u':'wkr-u').value.trim();
+  var p=document.getElementById(isMgr?'mgr-p':'wkr-p').value;
+  var a=document.getElementById(isMgr?'mgr-div':'wkr-zone').value;
+  var errEl=document.getElementById(isMgr?'mgr-err':'wkr-err');
+  if(!u||!p){errEl.textContent='⚠ Please enter your credentials.';return}
+  if(!CREDS[u]||CREDS[u]!==p){errEl.textContent='⚠ Invalid credentials. Try again.';return}
+  if(!a){errEl.textContent='⚠ Please select your '+(isMgr?'division':'zone')+'.';return}
+  errEl.textContent='';
+  currentRole=role;currentArea=a;
+  openDashboard(role,a);
+}
+function doLogout(){if(simInterval)clearInterval(simInterval);goSelect()}
+
+/* ═══════════════════════════════════════════════
+   OPEN DASHBOARD
+═══════════════════════════════════════════════ */
+function openDashboard(role,area){
+  var isMgr=role==='manager';
+  var machines;
+  if(isMgr){machines=MACHINES.filter(function(m){return m.region===area})}
+  else{var wRegion=AREA_TO_REGION[area]||'';machines=MACHINES.filter(function(m){return m.area===area||(m.isCentral&&m.region===wRegion)})}
+
+  var viewLat,viewLng,viewZoom;
+  if(isMgr){var r=REGIONS[area];viewLat=r.center[0];viewLng=r.center[1];viewZoom=r.zoom}
+  else{
+    var nm=machines.filter(function(m){return !m.isCentral});
+    if(nm.length){viewLat=nm.reduce(function(s,m){return s+m.lat},0)/nm.length;viewLng=nm.reduce(function(s,m){return s+m.lng},0)/nm.length;viewZoom=15}
+    else{viewLat=22.5726;viewLng=88.3639;viewZoom=13}
+  }
+
+  if(isMgr){
+    document.getElementById('tb-zone-mgr').innerHTML='Division: <strong>'+REGIONS[area].label+'</strong>';
+    document.getElementById('sb-title-mgr').textContent=REGIONS[area].label.toUpperCase();
+    document.getElementById('sb-sub-mgr').textContent='Machines + Central Hub in this division';
+  }else{
+    var al=AREA_LABELS[area]||area;
+    document.getElementById('tb-zone-wkr').innerHTML='Zone: <strong>'+al+'</strong>';
+    document.getElementById('sb-sub-wkr').textContent=al+' · '+(REGIONS[AREA_TO_REGION[area]]?REGIONS[AREA_TO_REGION[area]].label:'');
+  }
+
+  showScreen('screen-dashboard-'+role);
+  backToList(role);
+  buildSidebar(role,machines,area);
+  startClock(role);
+  startSimulation(machines,role);
+
+  setTimeout(function(){
+    var mapId=isMgr?'map-mgr':'map-wkr';
+    if(isMgr){if(mapMgr){mapMgr.remove();mapMgr=null}mapMgr=initManagerMap(mapId,machines,viewLat,viewLng,viewZoom)}
+    else{if(mapWkr){mapWkr.remove();mapWkr=null}mapWkr=initMap(mapId,machines,viewLat,viewLng,viewZoom,role)}
+  },120);
+}
+
+/* ═══════════════════════════════════════════════
+   SIDEBAR — LIST PANEL
+═══════════════════════════════════════════════ */
+function buildSidebar(role,machines,area){
+  var k=role==='manager'?'mgr':'wkr';
+  var statsEl=document.getElementById('stats-'+k);
+  var listEl=document.getElementById('mlist-'+k);
+  var cntEl=document.getElementById('mcount-'+k);
+  var nm=machines.filter(function(m){return !m.isCentral});
+  var avg=nm.length?Math.round(nm.reduce(function(a,m){return a+STATE[m.id].containerFill},0)/nm.length):0;
+  var active=nm.filter(function(m){return STATE[m.id].flowActive}).length;
+  var triggered=nm.filter(function(m){return STATE[m.id].pressureTriggered}).length;
+  statsEl.innerHTML=
+    '<div class="stat-tile"><div class="st-lbl">NODES</div><div class="st-val c">'+nm.length+'</div></div>'+
+    '<div class="stat-tile"><div class="st-lbl">AVG FILL</div><div class="st-val '+(avg>=80?'r':avg>=60?'a':'g')+'">'+avg+'%</div></div>'+
+    '<div class="stat-tile"><div class="st-lbl">FLOWING</div><div class="st-val c">'+active+'</div></div>'+
+    '<div class="stat-tile"><div class="st-lbl">ALERTS</div><div class="st-val '+(triggered>0?'r':'g')+'">'+triggered+'</div></div>';
+  if(cntEl)cntEl.innerHTML='<strong>'+(machines.length)+'</strong> nodes in zone';
+  listEl.innerHTML=machines.map(function(m){
+    var s=STATE[m.id];
+    var fill=Math.round(s.containerFill);
+    var fillColor=fill>=80?'#ff3b3b':fill>=60?'#ffb300':'var(--cyan)';
+    var badgeClass=!s.machineOn?'off':s.flowActive?'active':s.pressureTriggered?'standby':'standby';
+    var badgeText=!s.machineOn?'OFF':s.flowActive?'FLOWING':s.pressureTriggered?'ALERT':'READY';
+    var isCen=m.isCentral;
+    return '<div class="m-item'+(isCen?' central-item':'')+'" id="mi-'+m.id+'" onclick="selectMachine(\''+m.id+'\',\''+role+'\')" tabindex="0">'+
+      '<div class="m-top"><span class="m-id'+(isCen?' central':'')+'">'+m.id+'</span>'+
+      '<span class="m-badge '+(isCen?'central-badge':badgeClass)+'">'+( isCen?'⭐ HUB':badgeText)+'</span></div>'+
+      '<div class="m-name">'+m.name+'</div>'+
+      (isCen?'':
+        '<div class="m-fill-mini">'+
+          '<div class="m-fill-track"><div class="m-fill-bar" id="bar-'+m.id+'" style="width:'+fill+'%;background:'+fillColor+'"></div></div>'+
+          '<span class="m-fill-pct" id="pct-'+m.id+'">'+fill+'%</span>'+
+        '</div>')+
+    '</div>';
+  }).join('');
+}
+
+/* ═══════════════════════════════════════════════
+   DETAIL PANEL (Panel B)
+═══════════════════════════════════════════════ */
+function selectMachine(id,role){
+  selectedId[role]=id;
+  var m=MACHINES.find(function(x){return x.id===id});
+  if(!m)return;
+  var k=role==='manager'?'mgr':'wkr';
+  document.getElementById('det-id-'+k).textContent=m.id+(m.isCentral?' — CENTRAL HUB':'');
+  document.getElementById('det-id-'+k).className='detail-machine-id'+(m.isCentral?' central':'');
+  document.getElementById('det-name-'+k).textContent=m.name;
+  renderDetail(id,role);
+  document.getElementById('sb-panels-'+k).classList.add('detail-open');
+  document.querySelectorAll('.m-item').forEach(function(el){el.classList.remove('active')});
+  var item=document.getElementById('mi-'+id);
+  if(item)item.classList.add('active');
+  var map=role==='manager'?mapMgr:mapWkr;
+  if(map&&m){map.flyTo([m.lat,m.lng],17,{duration:1,easeLinearity:.3});setTimeout(function(){if(markerRef[m.id])markerRef[m.id].openPopup()},900)}
+}
+
+function backToList(role){
+  var k=role==='manager'?'mgr':'wkr';
+  selectedId[role]=null;
+  var panels=document.getElementById('sb-panels-'+k);
+  if(panels)panels.classList.remove('detail-open');
+}
+
+function renderDetail(id,role){
+  var m=MACHINES.find(function(x){return x.id===id});
+  var s=STATE[id];
+  if(!m||!s)return;
+  var k=role==='manager'?'mgr':'wkr';
+  var el=document.getElementById('det-scroll-'+k);
+  var fill=Math.round(s.containerFill);
+  var fillColor=fill>=80?'#ff3b3b':fill>=60?'#ffb300':'var(--cyan)';
+  var connectedCount=MACHINES.filter(function(x){return x.region===m.region&&!x.isCentral}).length;
+  var html='';
+
+  /* ── Power Section ── */
+  html+='<div class="detail-section">'+
+    '<div class="detail-section-title">Machine Power</div>'+
+    '<div class="power-row">'+
+      '<div class="power-label">🔌 Power<span class="power-status '+(s.machineOn?'on':'off')+'" id="pwr-status-'+id+'">'+(s.machineOn?'ONLINE':'OFFLINE')+'</span></div>'+
+      '<label class="tog" title="Toggle machine power">'+
+        '<input type="checkbox" '+(s.machineOn?'checked':'')+' onchange="toggleMachine(\''+id+'\',\''+role+'\',this.checked)">'+
+        '<span class="tog-track"></span><span class="tog-knob"></span>'+
+      '</label>'+
+    '</div>'+
+  '</div>';
+
+  /* ── Container Status ── */
+  if(!m.isCentral){
+    html+='<div class="detail-section">'+
+      '<div class="detail-section-title">Container Fill Level</div>'+
+      '<div class="gauge-wrap">'+
+        '<div class="gauge-track"><div class="gauge-fill" id="gauge-'+id+'" style="width:'+fill+'%;background:'+fillColor+'"></div></div>'+
+        '<div class="gauge-labels"><span>0%</span><span style="color:var(--amber)">WARN 80%</span><span>100%</span></div>'+
+        '<div class="gauge-pct" id="gauge-pct-'+id+'">'+fill+'%</div>'+
+        '<div class="gauge-warning'+(fill>=80?' show':'')+'" id="gauge-warn-'+id+'">⚠ CONTAINER CRITICAL — Pressure sensor triggered</div>'+
+      '</div>'+
+    '</div>';
+
+    /* ── Sensors ── */
+    var pressSig=!s.sensorPressure?'off-sig':s.pressureTriggered?'triggered':'standby';
+    var pressState=!s.sensorPressure?'SENSOR OFF':s.pressureTriggered?'TRIGGERED — Pressure high!':'Monitoring…';
+    var flowSig=!s.sensorFlow?'off-sig':s.flowActive?'active':'standby';
+    var flowState=!s.sensorFlow?'SENSOR OFF':s.flowActive?'ACTIVE — Water flowing':'Waiting for pressure trigger…';
+
+    html+='<div class="detail-section">'+
+      '<div class="detail-section-title">Sensor Controls</div>'+
+      '<div class="sensor-row">'+
+        '<div class="sensor-left">'+
+          '<div class="sensor-signal '+pressSig+'" id="sig-p-'+id+'"></div>'+
+          '<div class="sensor-info"><div class="sensor-name">Pressure Sensor</div><div class="sensor-state" id="pstate-'+id+'">'+pressState+'</div></div>'+
+        '</div>'+
+        '<div class="sensor-right">'+
+          '<span class="sensor-tog-label">ON/OFF</span>'+
+          '<label class="tog" title="Toggle pressure sensor">'+
+            '<input type="checkbox" '+(s.sensorPressure?'checked':'')+' onchange="toggleSensor(\''+id+'\',\'pressure\',\''+role+'\',this.checked)">'+
+            '<span class="tog-track purple-tog"></span><span class="tog-knob"></span>'+
+          '</label>'+
+        '</div>'+
+      '</div>'+
+      '<div class="sensor-row">'+
+        '<div class="sensor-left">'+
+          '<div class="sensor-signal '+flowSig+'" id="sig-f-'+id+'"></div>'+
+          '<div class="sensor-info"><div class="sensor-name">Flow Sensor</div><div class="sensor-state" id="fstate-'+id+'">'+flowState+'</div></div>'+
+        '</div>'+
+        '<div class="sensor-right">'+
+          '<span class="sensor-tog-label">ON/OFF</span>'+
+          '<label class="tog" title="Toggle flow sensor">'+
+            '<input type="checkbox" '+(s.sensorFlow?'checked':'')+' onchange="toggleSensor(\''+id+'\',\'flow\',\''+role+'\',this.checked)">'+
+            '<span class="tog-track purple-tog"></span><span class="tog-knob"></span>'+
+          '</label>'+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }
+
+  /* ── Central machine controls ── */
+  if(m.isCentral){
+    html+='<div class="detail-section">'+
+      '<div class="detail-section-title">Central Hub Controls</div>'+
+      '<div class="central-controls">'+
+        '<button class="btn-central btn-release" onclick="centralRelease(\''+id+'\',\''+role+'\')">💧 Release Water to Drainage</button>'+
+        '<button class="btn-central btn-estop" onclick="centralStop(\''+id+'\',\''+role+'\')">🛑 Emergency Stop All</button>'+
+        '<button class="btn-central btn-broadcast" onclick="centralBroadcast(\''+id+'\',\''+role+'\')">📡 Broadcast Signal</button>'+
+      '</div>'+
+      '<div class="connected-count">Connected to <strong>'+connectedCount+'</strong> field machines in this division</div>'+
+    '</div>';
+  }
+
+  /* ── Signal Log ── */
+  html+='<div class="detail-section">'+
+    '<div class="detail-section-title">Signal Log</div>'+
+    '<div class="sig-log" id="siglog-'+id+'">';
+  if(s.signals.length===0){
+    html+='<div class="sig-no-events">No events recorded</div>';
+  }else{
+    s.signals.slice(0,10).forEach(function(sig){
+      var cls=sig.type==='trigger'?'trigger':sig.type==='flow'?'flow':'info';
+      var t=sig.time.toLocaleTimeString('en-IN',{hour12:false});
+      html+='<div class="sig-entry '+cls+'"><span class="sig-time">'+t+'</span><span>'+sig.msg+'</span></div>';
+    });
+  }
+  html+='</div></div>';
+
+  el.innerHTML=html;
+}
+
+/* ═══════════════════════════════════════════════
+   UPDATE DETAIL PANEL (live refresh)
+═══════════════════════════════════════════════ */
+function updateDetailPanelLive(id){
+  var s=STATE[id];
+  if(!s)return;
+  var fill=Math.round(s.containerFill);
+  var fillColor=fill>=80?'#ff3b3b':fill>=60?'#ffb300':'var(--cyan)';
+
+  var g=document.getElementById('gauge-'+id);if(g){g.style.width=fill+'%';g.style.background=fillColor}
+  var gp=document.getElementById('gauge-pct-'+id);if(gp)gp.textContent=fill+'%';
+  var gw=document.getElementById('gauge-warn-'+id);if(gw){if(fill>=80)gw.classList.add('show');else gw.classList.remove('show')}
+
+  var pressSig=!s.sensorPressure?'off-sig':s.pressureTriggered?'triggered':'standby';
+  var flowSig=!s.sensorFlow?'off-sig':s.flowActive?'active':'standby';
+  var sp=document.getElementById('sig-p-'+id);if(sp)sp.className='sensor-signal '+pressSig;
+  var sf=document.getElementById('sig-f-'+id);if(sf)sf.className='sensor-signal '+flowSig;
+  var ps=document.getElementById('pstate-'+id);if(ps)ps.textContent=!s.sensorPressure?'SENSOR OFF':s.pressureTriggered?'TRIGGERED — Pressure high!':'Monitoring…';
+  var fs=document.getElementById('fstate-'+id);if(fs)fs.textContent=!s.sensorFlow?'SENSOR OFF':s.flowActive?'ACTIVE — Water flowing':'Waiting for pressure trigger…';
+
+  var pwrS=document.getElementById('pwr-status-'+id);if(pwrS){pwrS.className='power-status '+(s.machineOn?'on':'off');pwrS.textContent=s.machineOn?'ONLINE':'OFFLINE'}
+
+  var logEl=document.getElementById('siglog-'+id);
+  if(logEl){
+    if(s.signals.length===0){logEl.innerHTML='<div class="sig-no-events">No events recorded</div>'}
+    else{logEl.innerHTML=s.signals.slice(0,10).map(function(sig){var cls=sig.type==='trigger'?'trigger':sig.type==='flow'?'flow':'info';var t=sig.time.toLocaleTimeString('en-IN',{hour12:false});return'<div class="sig-entry '+cls+'"><span class="sig-time">'+t+'</span><span>'+sig.msg+'</span></div>'}).join('')}
+  }
+}
+
+/* ═══════════════════════════════════════════════
+   TOGGLE CONTROLS
+═══════════════════════════════════════════════ */
+function toggleMachine(id,role,on){
+  var s=STATE[id];if(!s)return;
+  s.machineOn=on;
+  if(!on){s.flowActive=false;s.signals.unshift({type:'info',msg:'Machine powered '+(on?'ON':'OFF'),time:new Date()})}
+  else{s.signals.unshift({type:'info',msg:'Machine powered ON',time:new Date()})}
+  updateListItem(id);
+  updateDetailPanelLive(id);
+}
+
+function toggleSensor(id,type,role,on){
+  var s=STATE[id];if(!s)return;
+  if(type==='pressure'){
+    s.sensorPressure=on;
+    s.signals.unshift({type:'info',msg:'Pressure sensor '+(on?'enabled':'disabled'),time:new Date()});
+    if(!on){s.pressureTriggered=false;s.flowActive=false}
+  }else{
+    s.sensorFlow=on;
+    s.signals.unshift({type:'info',msg:'Flow sensor '+(on?'enabled':'disabled'),time:new Date()});
+    if(!on)s.flowActive=false;
+    else if(s.pressureTriggered&&s.machineOn){s.flowActive=true;s.signals.unshift({type:'flow',msg:'FLOW SENSOR ACTIVATED — Water flowing through pipe',time:new Date()})}
+  }
+  updateListItem(id);
+  updateDetailPanelLive(id);
+}
+
+/* ── Central actions ── */
+function centralRelease(id,role){
+  var m=MACHINES.find(function(x){return x.id===id});
+  if(!m)return;
+  var regionalMachines=MACHINES.filter(function(x){return x.region===m.region&&!x.isCentral});
+  regionalMachines.forEach(function(x){
+    var s=STATE[x.id];
+    if(s&&s.machineOn){
+      s.flowActive=true;
+      s.signals.unshift({type:'flow',msg:'Central Hub commanded RELEASE — Flow activated',time:new Date()});
+    }
+  });
+  STATE[id].signals.unshift({type:'flow',msg:'RELEASE command sent to '+regionalMachines.length+' machines',time:new Date()});
+  updateDetailPanelLive(id);
+  alert('✅ Release command sent to '+regionalMachines.length+' field machines.');
+}
+function centralStop(id,role){
+  var m=MACHINES.find(function(x){return x.id===id});
+  if(!m)return;
+  MACHINES.filter(function(x){return x.region===m.region}).forEach(function(x){
+    var s=STATE[x.id];if(s){s.flowActive=false;s.signals.unshift({type:'info',msg:'Emergency STOP from Central Hub',time:new Date()})}
+  });
+  STATE[id].signals.unshift({type:'trigger',msg:'EMERGENCY STOP broadcast to all regional machines',time:new Date()});
+  updateDetailPanelLive(id);
+  alert('🛑 Emergency Stop broadcast to all machines in this division.');
+}
+function centralBroadcast(id,role){
+  STATE[id].signals.unshift({type:'info',msg:'Status broadcast sent to all connected nodes',time:new Date()});
+  updateDetailPanelLive(id);
+  alert('📡 Status broadcast sent to all connected machines.');
+}
+
+/* ═══════════════════════════════════════════════
+   SIMULATION
+═══════════════════════════════════════════════ */
+function startSimulation(machines,role){
+  if(simInterval)clearInterval(simInterval);
+  simInterval=setInterval(function(){
+    machines.forEach(function(m){
+      var s=STATE[m.id];
+      if(!s||!s.machineOn||m.isCentral)return;
+      if(s.flowActive){
+        s.containerFill=Math.max(0,s.containerFill-1.2);
+        if(s.containerFill<15){
+          s.flowActive=false;s.pressureTriggered=false;
+          s.signals.unshift({type:'info',msg:'Container drained — flow stopped automatically',time:new Date()});
+        }
+      }else{
+        s.containerFill=Math.min(100,s.containerFill+0.6);
+        if(s.containerFill>=80&&s.sensorPressure&&!s.pressureTriggered){
+          s.pressureTriggered=true;
+          s.signals.unshift({type:'trigger',msg:'⚠ PRESSURE TRIGGERED — Container at '+Math.round(s.containerFill)+'%',time:new Date()});
+          if(s.sensorFlow){
+            s.flowActive=true;
+            s.signals.unshift({type:'flow',msg:'FLOW SENSOR AUTO-ACTIVATED — Water flowing through pipe',time:new Date()});
+          }
+        }
+      }
+      updateListItem(m.id);
+    });
+    /* Live-update open detail panel */
+    ['manager','worker'].forEach(function(r){
+      if(selectedId[r])updateDetailPanelLive(selectedId[r]);
+    });
+    /* Refresh stats */
+    updateStats(machines,role);
+  },1800);
+}
+
+function updateListItem(id){
+  var s=STATE[id];var m=MACHINES.find(function(x){return x.id===id});if(!s||!m||m.isCentral)return;
+  var fill=Math.round(s.containerFill);
+  var fillColor=fill>=80?'#ff3b3b':fill>=60?'#ffb300':'var(--cyan)';
+  var b=document.getElementById('bar-'+id);if(b){b.style.width=fill+'%';b.style.background=fillColor}
+  var p=document.getElementById('pct-'+id);if(p)p.textContent=fill+'%';
+  var item=document.getElementById('mi-'+id);
+  if(item){
+    var badgeEl=item.querySelector('.m-badge');
+    if(badgeEl){
+      var badgeClass=!s.machineOn?'off':s.flowActive?'active':s.pressureTriggered?'standby':'standby';
+      var badgeText=!s.machineOn?'OFF':s.flowActive?'FLOWING':s.pressureTriggered?'ALERT':'READY';
+      badgeEl.className='m-badge '+badgeClass;badgeEl.textContent=badgeText;
+    }
+  }
+}
+
+function updateStats(machines,role){
+  var k=role==='manager'?'mgr':'wkr';
+  var statsEl=document.getElementById('stats-'+k);if(!statsEl)return;
+  var nm=machines.filter(function(m){return !m.isCentral});
+  var avg=nm.length?Math.round(nm.reduce(function(a,m){return a+STATE[m.id].containerFill},0)/nm.length):0;
+  var active=nm.filter(function(m){return STATE[m.id].flowActive}).length;
+  var triggered=nm.filter(function(m){return STATE[m.id].pressureTriggered&&!STATE[m.id].flowActive}).length;
+  statsEl.innerHTML=
+    '<div class="stat-tile"><div class="st-lbl">NODES</div><div class="st-val c">'+nm.length+'</div></div>'+
+    '<div class="stat-tile"><div class="st-lbl">AVG FILL</div><div class="st-val '+(avg>=80?'r':avg>=60?'a':'g')+'">'+avg+'%</div></div>'+
+    '<div class="stat-tile"><div class="st-lbl">FLOWING</div><div class="st-val c">'+active+'</div></div>'+
+    '<div class="stat-tile"><div class="st-lbl">ALERTS</div><div class="st-val '+(triggered>0?'r':'g')+'">'+triggered+'</div></div>';
+}
+
+/* ═══════════════════════════════════════════════
+   MAP
+═══════════════════════════════════════════════ */
+function initMap(cid,machines,clat,clng,zoom,role){
+  var map=L.map(cid,{center:[clat,clng],zoom:zoom});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
+
+  var byId={};MACHINES.forEach(function(m){byId[m.id]=m});
+  var vis={};machines.forEach(function(m){vis[m.id]=true});
+  var chain=PIPE_CHAIN.filter(function(id){return vis[id]});
+  for(var i=0;i<chain.length-1;i++){
+    var a=byId[chain[i]],b=byId[chain[i+1]];
+    if(a&&b)L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#00c6ff',weight:2.5,opacity:.48,dashArray:'10 7',className:'pipe-line'}).addTo(map);
+  }
+
+  machines.forEach(function(m){
+    var isCen=m.isCentral;
+    var icon=L.divIcon({
+      className:'',
+      html:'<div class="hyd-wrap" title="'+m.name+'"><div class="hyd-ring'+(isCen?' cen':'')+'"></div><div class="hyd-dot'+(isCen?' cen':'')+'"></div></div>',
+      iconSize:[24,24],iconAnchor:[12,12],popupAnchor:[0,-16]
+    });
+    var s=STATE[m.id];
+    var popHtml=isCen
+      ?'<div class="m-popup central-popup">'+
+          '<div class="pop-zone central">⭐ CENTRAL HUB — '+m.areaLabel+'</div>'+
+          '<div class="pop-name">'+m.name+'</div>'+
+          '<div class="pop-divider"></div>'+
+          '<div class="pop-row"><span class="pop-label">Status</span><span class="pop-val g">'+(s.machineOn?'ONLINE':'OFFLINE')+'</span></div>'+
+          '<div class="pop-row"><span class="pop-label">Connected Nodes</span><span class="pop-val c">'+MACHINES.filter(function(x){return x.region===m.region&&!x.isCentral}).length+'</span></div>'+
+          '<button class="pop-open-btn central-btn" onclick="selectMachine(\''+m.id+'\',\''+role+'\')">Open Controls →</button>'+
+        '</div>'
+      :'<div class="m-popup">'+
+          '<div class="pop-zone">'+m.id+' — '+m.areaLabel+'</div>'+
+          '<div class="pop-name">'+m.name+'</div>'+
+          '<div class="pop-divider"></div>'+
+          '<div class="pop-row"><span class="pop-label">Container Fill</span><span class="pop-val '+(s.containerFill>=80?'r':s.containerFill>=60?'a':'c')+'">'+Math.round(s.containerFill)+'%</span></div>'+
+          '<div class="pop-row"><span class="pop-label">Pressure Sensor</span><span class="pop-val '+(s.pressureTriggered?'r':'g')+'">'+(s.pressureTriggered?'TRIGGERED':'NORMAL')+'</span></div>'+
+          '<div class="pop-row"><span class="pop-label">Flow Status</span><span class="pop-val '+(s.flowActive?'c':'gr')+'">'+(s.flowActive?'ACTIVE':'STANDBY')+'</span></div>'+
+          '<div class="pop-row"><span class="pop-label">Machine</span><span class="pop-val '+(s.machineOn?'g':'r')+'">'+(s.machineOn?'ONLINE':'OFFLINE')+'</span></div>'+
+          '<button class="pop-open-btn" onclick="selectMachine(\''+m.id+'\',\''+role+'\')">Open Controls →</button>'+
+        '</div>';
+    var marker=L.marker([m.lat,m.lng],{icon:icon}).addTo(map).bindPopup(popHtml,{maxWidth:260,className:'hyd-popup'});
+    markerRef[m.id]=marker;
+  });
+
+  return map;
+}
+
+/* ═════════════════════════════════════════════
+   MANAGER MAP (green area-cluster dots)
+═══════════════════════════════════════════════ */
+function initManagerMap(cid,machines,clat,clng,zoom){
+  var map=L.map(cid,{center:[clat,clng],zoom:zoom});
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',{attribution:'&copy; OpenStreetMap &copy; CARTO',subdomains:'abcd',maxZoom:19}).addTo(map);
+  var byId={};MACHINES.forEach(function(m){byId[m.id]=m});
+  var vis={};machines.forEach(function(m){vis[m.id]=true});
+  /* Pipe chain */
+  var chain=PIPE_CHAIN.filter(function(id){return vis[id]});
+  for(var i=0;i<chain.length-1;i++){var a=byId[chain[i]],b=byId[chain[i+1]];if(a&&b)L.polyline([[a.lat,a.lng],[b.lat,b.lng]],{color:'#00c6ff',weight:2.5,opacity:.38,dashArray:'10 7',className:'pipe-line'}).addTo(map);}
+  /* Group non-central machines by area */
+  var aG={};machines.forEach(function(m){if(m.isCentral)return;if(!aG[m.area])aG[m.area]=[];aG[m.area].push(m);});
+  /* One green cluster dot per area */
+  Object.keys(aG).forEach(function(ak){
+    var aMs=aG[ak];
+    var alat=aMs.reduce(function(s,m){return s+m.lat},0)/aMs.length;
+    var alng=aMs.reduce(function(s,m){return s+m.lng},0)/aMs.length;
+    var worker=WORKERS.find(function(w){return w.area===ak});
+    var wCount=worker?1:0;
+    var aStates=aMs.map(function(m){return STATE[m.id]});
+    var anyP=aStates.some(function(s){return s.pressureTriggered});
+    var anyF=aStates.some(function(s){return s.flowActive});
+    var avgFill=Math.round(aStates.reduce(function(s,x){return s+x.containerFill},0)/aStates.length);
+    var icon=L.divIcon({className:'',html:'<div class="wc-wrap" title="'+aMs[0].areaLabel+' \u2014 '+wCount+' worker"><div class="wc-ring"></div><div class="wc-dot"><span class="wc-count">'+wCount+'</span></div></div>',iconSize:[36,36],iconAnchor:[18,18],popupAnchor:[0,-22]});
+    var wfP=anyP?'warn':'ok'; var wfPI=anyP?'!':'\u2713';
+    var wfF=anyF?'ok':'standby'; var wfFI=anyF?'\u2713':'\u25cb';
+    var wfC=avgFill>70?'warn':'ok'; var wfCI=avgFill>70?'!':'\u2713';
+    var popHtml='<div class="wkr-map-popup">'+
+      '<div class="wmp-area">\ud83d\udccd '+aMs[0].areaLabel+'</div>'+
+      '<div class="wmp-name">'+(worker?worker.name:'Area Worker')+'</div>'+
+      '<div class="wmp-machines">'+
+        '<div class="wmp-m-badge">'+aMs.length+' MACHINES</div>'+
+        '<div class="wmp-m-badge" style="color:#059669;border-color:rgba(5,150,105,.28);background:rgba(5,150,105,.08)">AVG '+avgFill+'%</div>'+
+      '</div>'+
+      '<div class="wmp-divider"></div>'+
+      '<div class="wmp-workflow-title">Workflow Status</div>'+
+      '<div class="wf-strip">'+
+        '<div class="wf-step"><div class="wf-step-dot '+wfP+'">'+wfPI+'</div><div class="wf-step-label">Pressure</div></div>'+
+        '<div class="wf-arrow"></div>'+
+        '<div class="wf-step"><div class="wf-step-dot '+wfF+'">'+wfFI+'</div><div class="wf-step-label">Flow</div></div>'+
+        '<div class="wf-arrow"></div>'+
+        '<div class="wf-step"><div class="wf-step-dot '+wfC+'">'+wfCI+'</div><div class="wf-step-label">Central</div></div>'+
+      '</div>'+
+      '<div class="wmp-btns">'+
+        '<button class="wmp-btn secondary" onclick="openCommunity(\''+ak+'\')" style="min-width:0">View Profile</button>'+
+        '<button class="wmp-btn primary" onclick="openImproveModal(\''+ak+'\',\''+aMs[0].areaLabel+'\')">\u26a1 Improve</button>'+
+      '</div>'+
+    '</div>';
+    var marker=L.marker([alat,alng],{icon:icon}).addTo(map).bindPopup(popHtml,{maxWidth:295,className:'hyd-popup'});
+    markerRef['area-'+ak]=marker;
+  });
+  /* Central hub markers — yellow, unchanged */
+  machines.filter(function(m){return m.isCentral}).forEach(function(m){
+    var s=STATE[m.id];
+    var icon=L.divIcon({className:'',html:'<div class="hyd-wrap" title="'+m.name+'"><div class="hyd-ring cen"></div><div class="hyd-dot cen"></div></div>',iconSize:[24,24],iconAnchor:[12,12],popupAnchor:[0,-16]});
+    var popHtml='<div class="m-popup central-popup">'+
+      '<div class="pop-zone central">\u2b50 CENTRAL HUB \u2014 '+m.areaLabel+'</div>'+
+      '<div class="pop-name">'+m.name+'</div>'+
+      '<div class="pop-divider"></div>'+
+      '<div class="pop-row"><span class="pop-label">Status</span><span class="pop-val g">'+(s.machineOn?'ONLINE':'OFFLINE')+'</span></div>'+
+      '<div class="pop-row"><span class="pop-label">Connected Nodes</span><span class="pop-val c">'+MACHINES.filter(function(x){return x.region===m.region&&!x.isCentral}).length+'</span></div>'+
+      '<button class="pop-open-btn central-btn" onclick="selectMachine(\''+m.id+'\',\'manager\')">Open Controls \u2192</button>'+
+    '</div>';
+    var marker=L.marker([m.lat,m.lng],{icon:icon}).addTo(map).bindPopup(popHtml,{maxWidth:260,className:'hyd-popup'});
+    markerRef[m.id]=marker;
+  });
+  return map;
+}
+
+function startClock(role){
+  var elId=role==='manager'?'time-mgr':'time-wkr';
+  if(clocks[role])clearInterval(clocks[role]);
+  function tick(){var el=document.getElementById(elId);if(el)el.textContent=new Date().toLocaleTimeString('en-IN',{hour12:false})}
+  tick();clocks[role]=setInterval(tick,1000);
+}
+/* ═════════════════════════════════════════════
+   COMMUNITY PANEL
+═══════════════════════════════════════════════ */
+var communityOpen=false,selectedWkrId=null,workerMessages={};
+
+function openCommunity(focusArea){
+  var overlay=document.getElementById('comm-overlay');if(!overlay)return;
+  var divWorkers=WORKERS.filter(function(w){return w.region===currentArea});
+  buildCommunityRoster(divWorkers,focusArea||null);
+  overlay.classList.add('open');communityOpen=true;
+}
+function closeCommunity(){
+  var overlay=document.getElementById('comm-overlay');
+  if(overlay)overlay.classList.remove('open');
+  communityOpen=false;selectedWkrId=null;
+}
+function buildCommunityRoster(workers,focusArea){
+  var roster=document.getElementById('comm-roster');if(!roster)return;
+  roster.innerHTML='<div class="comm-roster-title">DIVISION WORKERS ('+workers.length+')</div>';
+  workers.forEach(function(w){
+    var pc=w.perf>=88?'hi':w.perf>=75?'mid':'lo';
+    var ini=w.name.split(' ').map(function(n){return n[0]}).join('').substring(0,2);
+    var card=document.createElement('div');
+    card.className='wkr-card'+(focusArea===w.area?' selected':'');
+    card.id='wcard-'+w.id;
+    card.innerHTML=
+      '<div class="wkr-card-top">'+
+        '<div class="wkr-avatar">'+ini+'</div>'+
+        '<div class="wkr-info">'+
+          '<div class="wkr-name">'+w.name+'</div>'+
+          '<div class="wkr-meta">Age '+w.age+' \u00b7 '+w.machines.length+' machines</div>'+
+          '<div class="wkr-area-tag">\ud83d\udccd '+(AREA_LABELS[w.area]||w.area)+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="perf-row">'+
+        '<span class="perf-label">Performance</span>'+
+        '<div class="perf-track"><div class="perf-fill '+pc+'" style="width:'+w.perf+'%"></div></div>'+
+        '<span class="perf-pct '+pc+'">'+w.perf+'%</span>'+
+      '</div>'+
+      '<button class="btn-msg" onclick="event.stopPropagation();selectWorker(\''+w.id+'\',true)">\ud83d\udcac Message</button>';
+    card.onclick=function(){selectWorker(w.id,false)};
+    roster.appendChild(card);
+  });
+  if(focusArea){var fw=workers.find(function(w){return w.area===focusArea});if(fw)setTimeout(function(){selectWorker(fw.id,false)},60)}
+  else{renderEmptyProf()}
+}
+function selectWorker(wId,scrollToMsg){
+  selectedWkrId=wId;
+  document.querySelectorAll('.wkr-card').forEach(function(c){c.classList.remove('selected')});
+  var card=document.getElementById('wcard-'+wId);if(card)card.classList.add('selected');
+  var w=WORKERS.find(function(x){return x.id===wId});if(!w)return;
+  var profile=document.getElementById('comm-profile');if(!profile)return;
+  var pc=w.perf>=88?'hi':w.perf>=75?'mid':'lo';
+  var pcColor=pc==='hi'?'#059669':pc==='mid'?'#d97706':'#e53935';
+  var ini=w.name.split(' ').map(function(n){return n[0]}).join('').substring(0,2);
+  var msgs=workerMessages[wId]||[];
+  var msgsHtml=msgs.length===0
+    ?'<div class="msg-empty">No messages yet. Start a conversation.</div>'
+    :msgs.map(function(msg){
+        return '<div class="msg-bubble '+msg.from+'"><div>'+escHtml(msg.text)+'</div><div class="msg-meta">'+(msg.from==='sent'?'You':'Worker')+' \u00b7 '+msg.time.toLocaleTimeString('en-IN',{hour12:false})+'</div></div>';
+      }).join('');
+  var avgFill=Math.round(w.machines.reduce(function(s,id){return s+(STATE[id]?STATE[id].containerFill:0)},0)/w.machines.length);
+  profile.innerHTML=
+    '<div class="prof-header">'+
+      '<div class="prof-avatar">'+ini+'</div>'+
+      '<div class="prof-title">'+
+        '<div class="prof-name">'+w.name+'</div>'+
+        '<div class="prof-id">'+w.id+' \u00b7 FIELD WORKER</div>'+
+        '<div class="prof-tags">'+
+          '<span class="prof-tag area">\ud83d\udccd '+(AREA_LABELS[w.area]||w.area)+'</span>'+
+          '<span class="prof-tag perf" style="color:'+pcColor+';background:'+pcColor.replace(')',', .09)').replace('rgb','rgba')+';border-color:'+pcColor.replace(')',', .22)').replace('rgb','rgba')+'">\u26a1 '+w.perf+'% Performance</span>'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="prof-details-grid">'+
+      '<div class="prof-detail-card"><div class="pdc-label">Age</div><div class="pdc-value">'+w.age+' years</div></div>'+
+      '<div class="prof-detail-card"><div class="pdc-label">Contact</div><div class="pdc-value blue">'+w.contact+'</div></div>'+
+      '<div class="prof-detail-card"><div class="pdc-label">Joined</div><div class="pdc-value">'+w.joined+'</div></div>'+
+      '<div class="prof-detail-card"><div class="pdc-label">Machines</div><div class="pdc-value blue">'+w.machines.length+' nodes</div></div>'+
+      '<div class="prof-detail-card"><div class="pdc-label">Area</div><div class="pdc-value">'+(AREA_LABELS[w.area]||w.area)+'</div></div>'+
+      '<div class="prof-detail-card"><div class="pdc-label">Avg Fill Now</div><div class="pdc-value '+(avgFill>=80?'':'blue')+'">'+avgFill+'%</div></div>'+
+    '</div>'+
+    '<div class="prof-metrics">'+
+      '<h4>PERFORMANCE METRICS</h4>'+
+      '<div class="metric-row"><span class="metric-row-label">System Uptime</span><span class="metric-row-val" style="color:#059669">'+w.uptime+'%</span></div>'+
+      '<div class="metric-row"><span class="metric-row-label">Alerts Responded</span><span class="metric-row-val">'+w.alertsHandled+'</span></div>'+
+      '<div class="metric-row"><span class="metric-row-label">Avg Response Time</span><span class="metric-row-val">'+w.responseTime+'</span></div>'+
+      '<div class="metric-row"><span class="metric-row-label">Overall Performance</span><span class="metric-row-val" style="color:'+pcColor+'">'+w.perf+'%</span></div>'+
+    '</div>'+
+    '<div class="prof-msg-section">'+
+      '<h4>MESSAGE WORKER</h4>'+
+      '<div class="msg-thread" id="msg-thread-'+wId+'">'+msgsHtml+'</div>'+
+      '<div class="msg-compose">'+
+        '<input type="text" id="msg-input-'+wId+'" placeholder="Message '+w.name.split(' ')[0]+'\u2026" onkeydown="if(event.key===\'Enter\')sendWorkerMsg(\''+wId+'\')" autocomplete="off"/>'+
+        '<button onclick="sendWorkerMsg(\''+wId+'\')" id="msg-send-'+wId+'">SEND</button>'+
+      '</div>'+
+    '</div>';
+  if(scrollToMsg)setTimeout(function(){if(profile)profile.scrollTop=profile.scrollHeight},80);
+  setTimeout(function(){var t=document.getElementById('msg-thread-'+wId);if(t)t.scrollTop=t.scrollHeight},40);
+}
+function renderEmptyProf(){
+  var p=document.getElementById('comm-profile');if(!p)return;
+  p.innerHTML='<div class="comm-empty"><svg viewBox="0 0 64 64" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="32" cy="20" r="12"/><path d="M8 56c0-13.3 10.7-24 24-24s24 10.7 24 24"/></svg><span>Select a worker to view their full profile</span></div>';
+}
+function sendWorkerMsg(wId){
+  var input=document.getElementById('msg-input-'+wId);if(!input||!input.value.trim())return;
+  var msg={from:'sent',text:input.value.trim(),time:new Date()};
+  if(!workerMessages[wId])workerMessages[wId]=[];
+  workerMessages[wId].push(msg);
+  input.value='';
+  var replies=['Acknowledged. Will look into it right away.','On it! Updating the status shortly.','Got your message. Checking machines now.','Understood. Will resolve within the hour.','Received. Running a system check now.'];
+  setTimeout(function(){
+    var reply={from:'recv',text:replies[Math.floor(Math.random()*replies.length)],time:new Date()};
+    workerMessages[wId].push(reply);
+    if(selectedWkrId===wId)selectWorker(wId,false);
+  },1500+Math.floor(Math.random()*1000));
+  selectWorker(wId,false);
+  setTimeout(function(){var t=document.getElementById('msg-thread-'+wId);if(t)t.scrollTop=t.scrollHeight},60);
+}
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
+
+/* ═════════════════════════════════════════════
+   IMPROVEMENT REQUEST MODAL
+═══════════════════════════════════════════════ */
+var improveAreaKey=null;
+function openImproveModal(ak,areaLabel){
+  improveAreaKey=ak;
+  var m=document.getElementById('improve-modal-backdrop');if(!m)return;
+  document.getElementById('im-area-label').textContent=areaLabel;
+  document.getElementById('im-form').style.display='block';
+  document.getElementById('im-success').style.display='none';
+  document.getElementById('im-type').value='';
+  document.getElementById('im-priority').value='';
+  document.getElementById('im-desc').value='';
+  m.classList.add('open');
+}
+function closeImproveModal(){
+  var m=document.getElementById('improve-modal-backdrop');
+  if(m)m.classList.remove('open');
+  improveAreaKey=null;
+}
+function submitImprovement(){
+  var t=document.getElementById('im-type').value;
+  var p=document.getElementById('im-priority').value;
+  var d=document.getElementById('im-desc').value.trim();
+  if(!t||!p||!d){alert('Please fill in all fields before submitting.');return}
+  document.getElementById('im-form').style.display='none';
+  document.getElementById('im-success').style.display='block';
+  setTimeout(function(){closeImproveModal()},2400);
+}
+</script>
+</body>
+</html>

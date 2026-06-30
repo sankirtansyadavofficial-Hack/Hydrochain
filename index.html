@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>COMPILEX — HydroChain | India's First Smart Waterlogging System</title>
+  <meta name="description" content="HydroChain by COMPILEX — India's first AI-powered automated waterlogging prevention system for smart cities." />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>💧</text></svg>" />
+</head>
+<body>
+
+  <!-- ═══════ PRELOADER (HUD STYLE) ═══════ -->
+  <div id="preloader">
+    <div class="preloader-hud-container">
+      <svg class="hud-svg" viewBox="0 0 800 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Ambient Glow filter -->
+        <defs>
+          <filter id="hud-glow" x="-20%" y="-20%" width="140%" height="140%">
+            <feGaussianBlur stdDeviation="5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+
+        <!-- Outer static ring of dots -->
+        <circle cx="150" cy="150" r="115" stroke="rgba(0, 198, 255, 0.15)" stroke-width="2" stroke-dasharray="2 12" />
+
+        <!-- Rotating Slashed Ring (CW) -->
+        <circle class="hud-rotate-cw" cx="150" cy="150" r="98" stroke="rgba(0, 198, 255, 0.8)" stroke-width="4" stroke-dasharray="30 20 60 20" filter="url(#hud-glow)" />
+
+        <!-- Rotating Dot Slashed Ring (CCW) -->
+        <circle class="hud-rotate-ccw" cx="150" cy="150" r="82" stroke="rgba(0, 198, 255, 0.9)" stroke-width="6" stroke-dasharray="10 15" filter="url(#hud-glow)" />
+
+        <!-- Rotating inner segments (CW) -->
+        <circle class="hud-rotate-cw" cx="150" cy="150" r="68" stroke="rgba(0, 198, 255, 0.5)" stroke-width="2" stroke-dasharray="5 5 15 5" />
+
+        <!-- Inner solid ring with alignment notches -->
+        <circle cx="150" cy="150" r="54" stroke="rgba(0, 198, 255, 0.3)" stroke-width="1.5" />
+        <line x1="150" y1="30" x2="150" y2="40" stroke="rgba(0, 198, 255, 0.8)" stroke-width="2" />
+        <line x1="150" y1="260" x2="150" y2="270" stroke="rgba(0, 198, 255, 0.8)" stroke-width="2" />
+        <line x1="30" y1="150" x2="40" y2="150" stroke="rgba(0, 198, 255, 0.8)" stroke-width="2" />
+        <line x1="260" y1="150" x2="270" y2="150" stroke="rgba(0, 198, 255, 0.8)" stroke-width="2" />
+
+        <!-- Innermost Core -->
+        <circle cx="150" cy="150" r="35" fill="rgba(0, 198, 255, 0.08)" stroke="rgba(0, 198, 255, 0.6)" stroke-width="2" />
+        <!-- Crosshair inside core -->
+        <line x1="118" y1="150" x2="182" y2="150" stroke="rgba(0, 198, 255, 0.35)" stroke-width="1" />
+        <line x1="150" y1="118" x2="150" y2="182" stroke="rgba(0, 198, 255, 0.35)" stroke-width="1" />
+        <!-- Pulsing inner core glow dot -->
+        <circle class="hud-pulse" cx="150" cy="150" r="8" fill="rgba(0, 198, 255, 0.6)" />
+
+        <!-- Connector: circle → frame (dot + bridge line) -->
+        <line x1="270" y1="150" x2="270" y2="150" stroke="rgba(0, 198, 255, 0.5)" stroke-width="1.5" />
+        <circle cx="270" cy="150" r="3" fill="rgba(0, 198, 255, 0.9)" />
+        <circle cx="270" cy="110" r="3" fill="rgba(0, 198, 255, 0.6)" />
+        <circle cx="270" cy="190" r="3" fill="rgba(0, 198, 255, 0.6)" />
+        <line x1="270" y1="110" x2="270" y2="190" stroke="rgba(0, 198, 255, 0.3)" stroke-width="1" />
+
+        <!-- HUD TOP FRAME -->
+        <path d="M 270 100 L 290 80 H 730 L 750 100" stroke="rgba(0, 198, 255, 0.8)" stroke-width="2" filter="url(#hud-glow)" />
+        <path d="M 680 70 H 725 L 730 75" stroke="rgba(0, 198, 255, 0.8)" stroke-width="4" />
+
+        <!-- HUD BOTTOM FRAME -->
+        <path d="M 250 200 H 710 L 725 215 H 750" stroke="rgba(0, 198, 255, 0.8)" stroke-width="2" filter="url(#hud-glow)" />
+        <path d="M 250 215 H 610" stroke="rgba(0, 198, 255, 0.3)" stroke-width="1" />
+
+        <!-- Bottom Left Slanted Accent Blocks (///) -->
+        <path d="M 270 225 L 285 225 L 275 235 L 260 235 Z" fill="rgba(0, 198, 255, 0.8)" />
+        <path d="M 290 225 L 305 225 L 295 235 L 280 235 Z" fill="rgba(0, 198, 255, 0.8)" />
+        <path d="M 310 225 L 325 225 L 315 235 L 300 235 Z" fill="rgba(0, 198, 255, 0.8)" />
+        <path d="M 330 225 L 345 225 L 335 235 L 320 235 Z" fill="rgba(0, 198, 255, 0.8)" />
+
+        <!-- Bottom Right Vertical Indicator Ticks (|||||||) -->
+        <g stroke="rgba(0, 198, 255, 0.8)" stroke-width="2">
+          <line x1="680" y1="202" x2="680" y2="212" />
+          <line x1="687" y1="202" x2="687" y2="212" />
+          <line x1="694" y1="202" x2="694" y2="212" />
+          <line x1="701" y1="202" x2="701" y2="212" />
+          <line x1="708" y1="202" x2="708" y2="212" />
+          <line x1="715" y1="202" x2="715" y2="212" />
+          <line x1="722" y1="202" x2="722" y2="212" />
+        </g>
+      </svg>
+
+      <!-- HTML Content overlaid over the SVG -->
+      <div class="preloader-hud-content">
+        <h2 class="preloader-text">WELCOME TO THE FUTURE OF SMART CITIES</h2>
+        <div class="preloader-bar-wrapper">
+          <div class="preloader-bar-container">
+            <div class="preloader-bar"></div>
+          </div>
+          <span class="preloader-percentage">0%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ NAVBAR WITH SLIDING CURSOR PILL ═══════ -->
+  <nav id="navbar">
+    <div class="nav-left">
+      <div class="nav-brand">
+        <img src="compileXlogo.jpeg" alt="COMPILEX Logo" class="brand-logo-img" /> COMPILEX
+      </div>
+    </div>
+
+    <ul class="nav-links" id="nav-links">
+      <li class="nav-link" data-target="hero"><a href="#hero">Home</a></li>
+      <li class="nav-link" data-target="about"><a href="#about">About System</a></li>
+      <li class="nav-link" data-target="features"><a href="#features">Core Features</a></li>
+      <li class="nav-link" data-target="technology"><a href="#technology">Workflow</a></li>
+      <div id="nav-cursor"></div>
+    </ul>
+
+    <div class="nav-right">
+      <a href="portal.html" class="nav-btn-pill">Launch Control &rsaquo;</a>
+    </div>
+  </nav>
+
+  <!-- ═══════ HERO SECTION — UNTOUCHED ═══════ -->
+  <section id="hero">
+    <canvas id="water-bg-canvas"></canvas>
+
+    <div class="hero-wrapper-lido">
+      <div class="hero-left-content">
+        <div class="hero-badge-pill">HydroChain Protocol</div>
+        <h1 class="hero-title-left">India's First Smart Waterlogging System</h1>
+        <p class="hero-desc-left">AI-powered automated storm water management infrastructure — intelligently extracting, filtering, and redistributing municipal water across smart cities.</p>
+        
+        <div class="hero-cta-group">
+          <a href="#about" class="btn-lido-primary">Explore System &rsaquo;</a>
+          <a href="#features" class="btn-lido-secondary">View Features</a>
+        </div>
+      </div>
+
+      <div class="hero-right-free"></div>
+    </div>
+
+    <div class="hero-metrics-bar">
+      <div class="metric-item">
+        <div class="metric-value" data-target="500">0</div>
+        <div class="metric-label">Target Cities Infrastructure</div>
+      </div>
+      <div class="metric-divider"></div>
+      <div class="metric-item">
+        <div class="metric-value" data-target="99">0</div>
+        <div class="metric-label">Automated AI Control %</div>
+      </div>
+      <div class="metric-divider"></div>
+      <div class="metric-item">
+        <div class="metric-value" data-target="10">0</div>
+        <div class="metric-label">Mn Liters / Hour Capacity</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════ FIXED FRAME ANIMATION CANVAS — Persists from hero end to footer ═══════ -->
+  <div id="scroll-frame-bg" aria-hidden="true">
+    <canvas id="scroll-frame-canvas"></canvas>
+    <div id="scroll-frame-overlay"></div>
+  </div>
+
+  <!-- ═══════ SCROLL CONTENT WRAPPER — All sections overlay the fixed canvas ═══════ -->
+  <div id="scroll-content-wrapper">
+
+    <!-- ═══════ ABOUT SECTION ═══════ -->
+    <section id="about" class="scroll-content-section">
+      <div class="about-container">
+        <div class="about-header scroll-reveal">
+          <h2 class="section-heading">Redefining Urban Water Management</h2>
+          <p class="section-subtitle">A revolutionary AI-driven system designed to eliminate waterlogging from city streets during monsoon seasons — protecting lives, infrastructure, and the environment.</p>
+        </div>
+
+        <div class="about-grid">
+          <div class="about-text scroll-reveal" data-delay="100">
+            <h3>The Problem We Solve</h3>
+            <p>Every monsoon season, cities across the nation face <strong>catastrophic waterlogging</strong> on roads and streets. Commuters are stranded, infrastructure is damaged, and health hazards multiply. Despite decades of awareness, <strong>no decisive technological solution</strong> has been deployed at scale.</p>
+            <p>HydroChain changes this. Our system places <strong>intelligent water-extraction machines</strong> at the front face of roads, pulling water directly from streets through high-capacity motors. The water passes through <strong>multi-stage filtration</strong>, separating plastic, dust, and debris into sealed waste containers, while clean water flows through an elevated pipe network connected at electric pole height — far from human interference.</p>
+            <p>Each machine is connected in a <strong>chain topology</strong> via pressure-sensitive and flow sensors, with all signals routed to a <strong>Central AI Hub</strong> that orchestrates the entire network. Operators can shut down machines remotely via a web dashboard — <strong>no physical presence required</strong>.</p>
+          </div>
+
+          <div class="about-stats scroll-reveal" data-delay="200">
+            <div class="stat-card">
+              <div class="stat-number">500+</div>
+              <div class="stat-label">Cities Targetable</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number">99.9%</div>
+              <div class="stat-label">Uptime Automated</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number">10M+</div>
+              <div class="stat-label">Liters / Hour</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-number">24/7</div>
+              <div class="stat-label">Realtime Monitoring</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ FEATURES SECTION ═══════ -->
+    <section id="features" class="scroll-content-section">
+      <div class="features-container">
+        <div class="features-header scroll-reveal">
+          <h2 class="section-heading">Intelligent Infrastructure</h2>
+          <p class="section-subtitle">Every component of HydroChain is engineered for autonomous operation, real-time monitoring, and seamless coordination.</p>
+        </div>
+
+        <div class="feature-grid">
+          <div class="feature-card scroll-reveal" data-delay="0">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z"/><path d="M8 12l2-6 2 6-2 6-2-6z"/><path d="M12 8l6 2-6 2-6-2 6-2z"/></svg>
+            </div>
+            <h3>Automated Water Extraction</h3>
+            <p>High-capacity motors positioned at road fronts pull water directly from streets and drains, activating automatically when pressure sensors detect waterlogging thresholds.</p>
+          </div>
+
+          <div class="feature-card scroll-reveal" data-delay="80">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24"><path d="M3 4h18v4H3zM3 10h18v4H3zM3 16h18v4H3z"/><circle cx="7" cy="6" r="1"/><circle cx="7" cy="12" r="1"/><circle cx="7" cy="18" r="1"/></svg>
+            </div>
+            <h3>Smart Filtration System</h3>
+            <p>Multi-stage inline filtration separates plastics, silt, and organic debris. Waste is stored in sealed compartments while clean water continues through the pipe network.</p>
+          </div>
+
+          <div class="feature-card scroll-reveal" data-delay="160">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24"><path d="M12 2v20M2 12h20"/><circle cx="12" cy="12" r="9"/><path d="M12 6v2M12 16v2M6 12h2M16 12h2"/></svg>
+            </div>
+            <h3>Pressure &amp; Flow Sensors</h3>
+            <p>Pressure-sensitive sensors at each node and flow meters inside pipes continuously monitor water levels, flow rates, and pipe integrity in real-time.</p>
+          </div>
+
+          <div class="feature-card scroll-reveal" data-delay="240">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24"><path d="M4 12h4M16 12h4"/><circle cx="12" cy="12" r="4"/><path d="M2 6h6M16 6h6M2 18h6M16 18h6"/><circle cx="12" cy="6" r="2"/><circle cx="12" cy="18" r="2"/></svg>
+            </div>
+            <h3>Chain-Connected Pipe Network</h3>
+            <p>Elevated pipe layers run through electric poles at safe heights, connecting machine to machine in a chain topology that transports water to the central hub.</p>
+          </div>
+
+          <div class="feature-card scroll-reveal" data-delay="320">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 12h8M12 8v8"/><circle cx="8" cy="8" r="1.5"/><circle cx="16" cy="8" r="1.5"/><circle cx="8" cy="16" r="1.5"/><circle cx="16" cy="16" r="1.5"/></svg>
+            </div>
+            <h3>Central AI Control Hub</h3>
+            <p>All machines route signals to a central system deployed near open pits or grounds. AI orchestrates the full chain — activating, throttling, and halting machines as needed.</p>
+          </div>
+
+          <div class="feature-card scroll-reveal" data-delay="400">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 9h3v3H7zM14 9h3v3h-3z"/></svg>
+            </div>
+            <h3>Manual Override Dashboard</h3>
+            <p>Municipal operators access a real-time web dashboard to monitor, override, or shut down any machine remotely — no physical presence at the site required.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ TECHNOLOGY / HOW IT WORKS ═══════ -->
+    <section id="technology" class="scroll-content-section">
+      <div class="tech-container">
+        <div class="tech-header scroll-reveal">
+          <h2 class="section-heading">How HydroChain Operates</h2>
+          <p class="section-subtitle">From rain detection to water redistribution — a fully automated pipeline that protects your city in real-time.</p>
+        </div>
+
+        <div class="tech-steps">
+          <div class="tech-step scroll-reveal" data-delay="0">
+            <div class="step-marker">01</div>
+            <div class="step-content">
+              <h3>Rain Detection &amp; Activation</h3>
+              <p>Pressure sensors at each machine detect rising water levels on the street surface. Once the threshold is reached, the system automatically activates the extraction motors.</p>
+            </div>
+          </div>
+
+          <div class="tech-step scroll-reveal" data-delay="100">
+            <div class="step-marker">02</div>
+            <div class="step-content">
+              <h3>Water Extraction &amp; Intake</h3>
+              <p>High-powered motors pull water from roads and nearby drains. Each machine is designed for maximum intake within a localized radius to ensure effective coverage.</p>
+            </div>
+          </div>
+
+          <div class="tech-step scroll-reveal" data-delay="200">
+            <div class="step-marker">03</div>
+            <div class="step-content">
+              <h3>Multi-Stage Filtration</h3>
+              <p>Ingested water passes through filtration layers that separate plastics, silt, dust, and organic matter. Waste is stored in sealed containers for periodic collection.</p>
+            </div>
+          </div>
+
+          <div class="tech-step scroll-reveal" data-delay="300">
+            <div class="step-marker">04</div>
+            <div class="step-content">
+              <h3>Elevated Pipe Transport</h3>
+              <p>Filtered water is pushed through pipe layers elevated on electric poles. The height keeps the system tamper-proof while maintaining consistent water flow between machines.</p>
+            </div>
+          </div>
+
+          <div class="tech-step scroll-reveal" data-delay="400">
+            <div class="step-marker">05</div>
+            <div class="step-content">
+              <h3>Chain Signal Propagation</h3>
+              <p>Flow and pressure sensors relay data along the chain. Each machine communicates its status to the next, and all data converges at the Central AI Hub for real-time orchestration.</p>
+            </div>
+          </div>
+
+          <div class="tech-step scroll-reveal" data-delay="500">
+            <div class="step-marker">06</div>
+            <div class="step-content">
+              <h3>Central Redistribution</h3>
+              <p>The Central Machine, positioned near open grounds or pits, receives all water from the chain and releases it into designated areas. Once container levels normalize, flow automatically halts.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══════ SYSTEM WORKFLOW SECTION ═══════ -->
+    <section id="system-workflow" aria-label="System Workflow">
+      <!-- Ambient background orbs -->
+      <div class="sw-orb sw-orb-1" aria-hidden="true"></div>
+      <div class="sw-orb sw-orb-2" aria-hidden="true"></div>
+      <div class="sw-orb sw-orb-3" aria-hidden="true"></div>
+
+      <div class="sw-inner">
+
+        <!-- Section header -->
+        <div class="sw-header sw-reveal">
+          <p class="sw-eyebrow">Live Demonstration</p>
+          <h2 class="sw-title">System Workflow</h2>
+          <p class="sw-desc">Watch the HydroChain infrastructure in motion — from street-level water detection through multi-stage filtration, chain transport, and final redistribution at the Central Hub.</p>
+        </div>
+
+        <!-- Video frame -->
+        <div class="sw-video-frame sw-reveal sw-reveal-delay-1">
+          <!-- Decorative corner accents -->
+          <span class="sw-corner sw-corner-tl" aria-hidden="true"></span>
+          <span class="sw-corner sw-corner-tr" aria-hidden="true"></span>
+          <span class="sw-corner sw-corner-bl" aria-hidden="true"></span>
+          <span class="sw-corner sw-corner-br" aria-hidden="true"></span>
+
+          <!-- Frosted label bar -->
+          <div class="sw-video-label">
+            <span class="sw-label-dot"></span>
+            <span class="sw-label-text">HydroChain · System Demonstration</span>
+            <span class="sw-label-badge">HD</span>
+          </div>
+
+          <!-- The video -->
+          <video
+            id="workflow-video"
+            class="sw-video"
+            src="systemworkflow.mp4"
+            preload="auto"
+            muted
+            playsinline
+            loop
+            aria-label="HydroChain system workflow demonstration video"
+          ></video>
+
+          <!-- Play overlay -->
+          <div class="sw-play-overlay" id="sw-play-overlay" role="button" tabindex="0" aria-label="Play workflow video" onclick="swTogglePlay()" onkeydown="if(event.key==='Enter'||event.key===' ')swTogglePlay()">
+            <div class="sw-play-btn">
+              <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="11" stroke="currentColor" stroke-width="1.5" opacity="0.4"/><path d="M10 8.5l6 3.5-6 3.5V8.5z" fill="currentColor"/></svg>
+            </div>
+            <span>Play Full Demo</span>
+          </div>
+        </div>
+
+        <!-- Workflow pill badges -->
+        <div class="sw-pills sw-reveal sw-reveal-delay-2">
+          <div class="sw-pill sw-pill-1">
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v4l2.5 1.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            Real-time Detection
+          </div>
+          <div class="sw-pill sw-pill-2">
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Chain Transport
+          </div>
+          <div class="sw-pill sw-pill-3">
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><rect x="2" y="4" width="12" height="8" rx="2" stroke="currentColor" stroke-width="1.5"/><path d="M5 8h6M8 6v4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+            AI Orchestration
+          </div>
+          <div class="sw-pill sw-pill-4">
+            <svg viewBox="0 0 16 16" fill="none" aria-hidden="true"><path d="M8 2v2M8 12v2M2 8h2M12 8h2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="8" r="3" stroke="currentColor" stroke-width="1.5"/></svg>
+            Smart Redistribution
+          </div>
+        </div>
+
+        <!-- CTA -->
+        <div class="sw-cta sw-reveal sw-reveal-delay-3">
+          <a href="portal.html" class="sw-cta-btn">Open Control Portal &rsaquo;</a>
+          <a href="#about" class="sw-cta-link">Learn how it works &darr;</a>
+        </div>
+
+      </div>
+    </section>
+    <!-- END SYSTEM WORKFLOW -->
+
+  </div>
+  <!-- END SCROLL CONTENT WRAPPER -->
+
+  <!-- ═══════ FOOTER ═══════ -->
+  <footer id="footer">
+    <div class="footer-main">
+      <div class="footer-brand-section">
+        <h4 class="footer-brand-title">
+          <img src="compileXlogo.jpeg" alt="COMPILEX Logo" class="footer-brand-logo" /> COMPILEX
+        </h4>
+        <p>COMPILEX builds next-generation smart city infrastructure solutions — automated, intelligent, and designed for the future of urban living.</p>
+      </div>
+
+      <div class="footer-col">
+        <h5>Quick Link</h5>
+        <ul>
+          <li><a href="#hero">Home</a></li>
+          <li><a href="#about">About Us</a></li>
+          <li><a href="#footer">Contact Us</a></li>
+          <li><a href="#">License</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h5>Company</h5>
+        <ul>
+          <li><a href="#">Service</a></li>
+          <li><a href="#">Service Details</a></li>
+          <li><a href="#features">Project</a></li>
+          <li><a href="#">Project Details</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h5>Others</h5>
+        <ul>
+          <li><a href="#">Blog</a></li>
+          <li><a href="#">Blog Details</a></li>
+          <li><a href="#technology">Documentation</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-col">
+        <h5>Social</h5>
+        <ul>
+          <li><a href="#">Facebook</a></li>
+          <li><a href="#">LinkedIn</a></li>
+          <li><a href="#">Instagram</a></li>
+          <li><a href="#">Twitter</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="footer-bottom">
+      <p>&copy; 2026 COMPILEX. All rights reserved.</p>
+      <p>Design by COMPILEX &mdash; Powered by HydroChain</p>
+    </div>
+
+  </footer>
+
+  <script src="script.js"></script>
+
+  <script>
+  /* ── System Workflow section interactions ── */
+  (function(){
+    var video = document.getElementById('workflow-video');
+    var overlay = document.getElementById('sw-play-overlay');
+    var isPlaying = false;
+
+    /* Add sw-pre to reveal elements so animation starts hidden (after DOM ready) */
+    var revealEls = document.querySelectorAll('.sw-reveal');
+    revealEls.forEach(function(el){ el.classList.add('sw-pre'); });
+
+    /* IntersectionObserver: play video when 30% visible, pause when gone */
+    if(video){
+      var vidObs = new IntersectionObserver(function(entries){
+        entries.forEach(function(e){
+          if(e.isIntersecting){
+            if(video.paused) {
+              video.play().then(function(){ 
+                isPlaying=true; 
+                if(overlay)overlay.classList.add('sw-hidden'); 
+              }).catch(function(){});
+            }
+          } else {
+            if(!video.paused) {
+              video.pause(); 
+              isPlaying=false;
+              if(overlay)overlay.classList.remove('sw-hidden');
+            }
+          }
+        });
+      },{threshold:0.3});
+      vidObs.observe(video);
+    }
+
+    /* Manual toggle */
+    window.swTogglePlay = function(){
+      if(!video) return;
+      if(!video.paused){ 
+        video.pause(); 
+        isPlaying=false; 
+        if(overlay)overlay.classList.remove('sw-hidden'); 
+      } else { 
+        video.play().then(function(){ 
+          isPlaying=true; 
+          if(overlay)overlay.classList.add('sw-hidden'); 
+        }).catch(function(){}); 
+      }
+    };
+
+    /* Scroll reveal: remove sw-pre and add sw-visible when element enters viewport */
+    if('IntersectionObserver' in window && revealEls.length){
+      var revObs = new IntersectionObserver(function(entries){
+        entries.forEach(function(e){
+          if(e.isIntersecting){
+            e.target.classList.remove('sw-pre');
+            e.target.classList.add('sw-visible');
+            revObs.unobserve(e.target);
+          }
+        });
+      },{threshold:0.1,rootMargin:'0px 0px -20px 0px'});
+      revealEls.forEach(function(el){ revObs.observe(el); });
+    } else {
+      revealEls.forEach(function(el){ el.classList.remove('sw-pre'); el.classList.add('sw-visible'); });
+    }
+  })();
+  </script>
+</body>
+</html>
