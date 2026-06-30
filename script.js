@@ -94,10 +94,13 @@
     var footer = $("footer");
     if (!hero || !footer) return;
 
-    // The animation zone: from bottom of hero to top of footer
+    // The animation zone: from bottom of hero to when the footer enters the viewport
     var heroBottom = hero.offsetTop + hero.offsetHeight;
     var footerTop = footer.offsetTop;
-    var animationZoneHeight = footerTop - heroBottom;
+    
+    // End the animation zone when the top of the footer reaches the bottom of the viewport
+    var animationZoneEnd = footerTop - window.innerHeight;
+    var animationZoneHeight = animationZoneEnd - heroBottom;
 
     // Current scroll position relative to the animation zone
     var scrolled = window.scrollY - heroBottom;
