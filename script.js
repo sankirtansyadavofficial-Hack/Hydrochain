@@ -21,7 +21,7 @@
      240 portrait frames from "scroll animation/" folder
      Canvas is position:fixed, shown from hero end to footer start
      ═══════════════════════════════════════════════════════════════ */
-  var TOTAL_FRAMES = 240;
+  var TOTAL_FRAMES = 60;
   var frameImages = [];
   var framesLoaded = 0;
   var scrollCanvas = $("scroll-frame-canvas");
